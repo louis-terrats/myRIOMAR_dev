@@ -10,13 +10,12 @@ from matplotlib.path import Path
 from collections import deque
 from scipy.spatial.distance import cdist
 from concave_hull import concave_hull
-from myRIOMAR.utils import load_file
 from shapely.geometry import Polygon
 from shapely.vectorized import contains
 from skimage import morphology
 from functools import reduce
 
-from myRIOMAR.utils import (expand_grid)
+from utils import (expand_grid, load_file)
 
 # =============================================================================
 #### Functions

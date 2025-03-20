@@ -1,9 +1,9 @@
 import multiprocessing
 import pandas as pd
 
-from myRIOMAR._2_regional_maps.utils import Create_and_save_the_maps, QC_maps, get_all_possibilities
+from _2_regional_maps.utils import Create_and_save_the_maps, QC_maps, get_all_possibilities
 
-from myRIOMAR.utils import (store_arguments, unique_years_between_two_dates)
+from utils import (store_arguments, unique_years_between_two_dates)
 
 
 def create_regional_maps(arguments) :

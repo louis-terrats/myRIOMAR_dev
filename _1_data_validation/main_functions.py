@@ -1,8 +1,8 @@
 import gc
 
-from myRIOMAR._1_data_validation.utils import MU_database_processing
+from _1_data_validation.utils import MU_database_processing
 
-from myRIOMAR.utils import (store_arguments, get_all_cases_to_process)
+from utils import (store_arguments, get_all_cases_to_process)
 
 
 def Match_up_with_insitu_measurements(core_arguments, redo_the_MU_database, nb_of_cores_to_use,

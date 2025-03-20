@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 
-from myRIOMAR.utils import (add_array_to_dict, path_to_fill_to_where_to_save_satellite_files, fill_the_sat_paths,
+from utils import (add_array_to_dict, path_to_fill_to_where_to_save_satellite_files, fill_the_sat_paths,
                             create_arborescence, find_sat_data_files,merge_dicts, get_empty_paths,
                             return_the_parameter_name_based_on_file_name, get_non_empty_paths,
                             extract_the_time_from_the_satellite_file, access_item_in_a_dictionnary, 

@@ -263,13 +263,13 @@ def fill_the_sat_paths(info, path_to_fill, local_path = False, dates = []) :
     
     return paths_to_sat_files
 
-def get_all_cases_to_process(Data_sources, Sensor_names, Atmospheric_corrections, Satellite_variables, Temporal_resolution) : 
+def get_all_cases_to_process(core_arguments) : 
         
-    cases_to_process = expand_grid(Data_source = Data_sources, 
-                                    sensor_name = Sensor_names, 
-                                    atmospheric_correction = Atmospheric_corrections,
-                                    Satellite_variable = Satellite_variables,
-                                    Temporal_resolution = Temporal_resolution)
+    cases_to_process = expand_grid(Data_source = core_arguments['Data_sources'], 
+                                    sensor_name = core_arguments['Sensor_names'], 
+                                    atmospheric_correction = core_arguments['Atmospheric_corrections'],
+                                    Satellite_variable = core_arguments['Satellite_variables'],
+                                    Temporal_resolution = core_arguments['Temporal_resolution'] if 'Temporal_resolution' in core_arguments else ['DAILY'])
     
     cases_to_process['atmospheric_correction'] = cases_to_process.apply(lambda row: 'Standard' 
                                                                         if np.isin(row['Data_source'], ['SEXTANT', 'EUMETSAT']) 

@@ -6,7 +6,7 @@ Created on Fri Jan 10 11:40:41 2025
 @author: terrats
 """
 
-from myRIOMAR._4_X11_analysis.utils_functions import (F_EVF_V1_2, F_census_X_11_pezzulli_V1_2, f_test_season_v1_1, f_kendall_sen_v1_0, 
+from _4_X11_analysis.utils_functions import (F_EVF_V1_2, F_census_X_11_pezzulli_V1_2, f_test_season_v1_1, f_kendall_sen_v1_0, 
                                                    f_seasonal_kendall_v2_0, linfit, F_test_pente)
 import pandas as pd
 import numpy as np

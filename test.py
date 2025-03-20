@@ -11,18 +11,18 @@ Created on Wed Jan  8 12:41:48 2025
 # =============================================================================
 
 # working_directory = "/data/home/terrats/" # '/data/home/terrats/' # on rs-pro machine  
-path_to_RIOMAR_package = "/home/terrats/Desktop/RIOMAR/PACKAGE/myRIOMAR"
+path_to_RIOMAR_package = "/home/terrats/Desktop/RIOMAR/PACKAGE/myRIOMAR_dev"
 
 import sys
 sys.path.append(path_to_RIOMAR_package)
 
-import myRIOMAR, multiprocessing
-import matplotlib as mpl
+import myRIOMAR_dev as myRIOMAR
 
+import multiprocessing, matplotlib 
 
 # Set matplotlib backend to prevent plots from displaying
 # mpl.use('module://matplotlib_inline.backend_inline') # To show plots on the Plot panel (be careful as it consumes RAM memory !)
-mpl.use('agg') # Prevent showing plot in the Plot panel (this saves RAM memory)
+matplotlib.use('agg') # Prevent showing plot in the Plot panel (this saves RAM memory)
 
 # =============================================================================
 # ### Apply the functions
@@ -33,7 +33,7 @@ core_arguments = {  'Data_sources': ['SEXTANT'],
                     'Satellite_variables':['CHLA'],
                     'Atmospheric_corrections':["polymer"],
                     'Temporal_resolution': ["DAILY"],
-                    'start_day' : '2018/08/01',
+                    'start_day' : '2018/07/31',
                     'end_day' : '2018/08/31'}
 
 
@@ -45,8 +45,8 @@ myRIOMAR._0_data_downloading.Download_satellite_data(core_arguments,
 myRIOMAR._0_data_downloading.Plot_and_Save_the_map(core_arguments,
                                                    nb_of_cores_to_use = 6,
                                                    where_are_saved_satellite_data = "/home/terrats/Desktop/RIOMAR/TEST/SATELLITE_DATA/",
-                                                   start_day_of_maps_to_plot = '2018/08/01',
-                                                   end_day_of_maps_to_plot = '2018/08/06')
+                                                   start_day_of_maps_to_plot = '2018/07/31',
+                                                   end_day_of_maps_to_plot = '2018/08/01')
 
 myRIOMAR._1_data_validation.Match_up_with_insitu_measurements(core_arguments, 
                                                               redo_the_MU_database = False, 

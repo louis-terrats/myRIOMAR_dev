@@ -7,7 +7,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-from myRIOMAR.utils import (find_sat_data_files, km_to_degrees, path_to_fill_to_where_to_save_satellite_files,
+from utils import (find_sat_data_files, km_to_degrees, path_to_fill_to_where_to_save_satellite_files,
                             fill_the_sat_paths, extract_the_time_from_the_satellite_file)
 
 

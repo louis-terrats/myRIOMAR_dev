@@ -11,7 +11,7 @@ from scipy.stats import lognorm, kstest
 
 import os, re, gc, pickle, datetime, glob, calendar, math, sys
 
-from myRIOMAR.utils import (load_file, align_bathymetry_to_resolution, degrees_to_km, find_sat_data_files, expand_grid,
+from utils import (load_file, align_bathymetry_to_resolution, degrees_to_km, find_sat_data_files, expand_grid,
                             path_to_fill_to_where_to_save_satellite_files, fill_the_sat_paths,
                             extract_and_format_date_from_path)
 

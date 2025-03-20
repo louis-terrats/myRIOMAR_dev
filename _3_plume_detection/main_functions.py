@@ -7,12 +7,12 @@ import matplotlib as mpl
 # import rpy2.robjects as robjects
 
 
-from myRIOMAR.utils import (exit_program, expand_grid, align_bathymetry_to_resolution, 
+from utils import (exit_program, expand_grid, align_bathymetry_to_resolution, 
                             unique_years_between_two_dates, store_arguments, load_shapefile_data,
                             path_to_fill_to_where_to_save_satellite_files,
                             fill_the_sat_paths)
 
-from myRIOMAR._3_plume_detection.utils import (main_process, define_parameters, reduce_resolution, 
+from _3_plume_detection.utils import (main_process, define_parameters, reduce_resolution, 
                                             create_polygon_mask, preprocess_annual_dataset_and_compute_land_mask,
                                             get_all_possibilities_for_plume_detection)
 
