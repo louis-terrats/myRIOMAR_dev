@@ -344,14 +344,14 @@ def extract_key_data(map_ini, info,
                                               np.min(map_values_of_the_zone.lon), 
                                               np.max(map_values_of_the_zone.lon)]]}
 
-def get_all_possibilities(Zones, Data_sources, Satellite_sensors, Atmospheric_corrections, Years, Satellite_variables) : 
+def get_all_possibilities(core_arguments) : 
 
-    all_possibilities = expand_grid( Zone = Zones,
-                                    Data_source = Data_sources, 
-                                    sensor_name = Satellite_sensors, 
-                                    atmospheric_correction = Atmospheric_corrections,
-                                    Year = Years,
-                                    Satellite_variable = Satellite_variables)
+    all_possibilities = expand_grid( Zone = core_arguments['Zones'],
+                                    Data_source = core_arguments['Data_sources'], 
+                                    sensor_name = core_arguments['Sensor_names'], 
+                                    atmospheric_correction = core_arguments['Atmospheric_corrections'],
+                                    Year = core_arguments['Years'],
+                                    Satellite_variable = core_arguments['Satellite_variables'])
     all_possibilities['atmospheric_correction'] = all_possibilities.apply(lambda row: 'Standard' 
                                                                         if row['Data_source'] == 'SEXTANT' 
                                                                         else row['atmospheric_correction'], axis=1)

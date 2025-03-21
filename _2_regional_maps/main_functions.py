@@ -6,28 +6,12 @@ from _2_regional_maps.utils import Create_and_save_the_maps, QC_maps, get_all_po
 from utils import (store_arguments, unique_years_between_two_dates)
 
 
-def create_regional_maps(arguments) :
-        
-    (Data_sources, 
-     Sensor_names, 
-     Satellite_variables, 
-     Atmospheric_corrections,
-     Temporal_resolution, 
-     start_day, end_day, 
-     working_directory, 
-     where_to_save_satellite_data, 
-     overwrite_existing_satellite_files,
-     redo_the_MU_database,
-     path_to_SOMLIT_insitu_data,
-     path_to_REPHY_insitu_data,
-     Zones,
-     overwrite_existing_regional_maps,
-     plot_the_daily_regional_maps,
-     nb_of_cores_to_use) = store_arguments(arguments, return_arguments = True)
+def create_regional_maps(arguments, Zones, overwrite_existing_regional_maps, plot_the_daily_regional_maps) :
+            
+    core_arguments.update({'Years' : unique_years_between_two_dates(core_arguments['start_day'], core_arguments['end_day']),
+                           'Zones' : Zones})
     
-    Years = unique_years_between_two_dates(start_day, end_day)
-    
-    cases_to_process = get_all_possibilities(Zones, Data_sources, Sensor_names, Atmospheric_corrections, Years, Satellite_variables)
+    cases_to_process = get_all_possibilities(core_arguments)
     
     for i, info in cases_to_process.iterrows() : 
                 

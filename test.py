@@ -11,8 +11,8 @@ Created on Wed Jan  8 12:41:48 2025
 # =============================================================================
 
 # working_directory = "/data/home/terrats/" # '/data/home/terrats/' # on rs-pro machine  
-# path_to_RIOMAR_package = "/home/terrats/Desktop/RIOMAR/PACKAGE/myRIOMAR_dev"
-path_to_RIOMAR_package = "/media/shared_storage/Documents/CODING/PROJECTS/myRIOMAR_dev"
+path_to_RIOMAR_package = "/home/terrats/Desktop/RIOMAR/PACKAGE/myRIOMAR_dev"
+# path_to_RIOMAR_package = "/media/shared_storage/Documents/CODING/PROJECTS/myRIOMAR_dev"
 
 import sys
 sys.path.append(path_to_RIOMAR_package)
@@ -55,7 +55,7 @@ myRIOMAR._1_data_validation.Match_up_with_insitu_measurements(core_arguments,
                                                               where_to_save_Match_Up_data = "/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/")
 
 
-myRIOMAR._2_regional_maps.create_regional_maps(arguments.update({'nb_of_cores_to_use' : 4}) or arguments,
+myRIOMAR._2_regional_maps.create_regional_maps(core_arguments,
                                                Zones = ['BAY_OF_BISCAY', 'BAY_OF_SEINE', 'GULF_OF_LION'],
                                                overwrite_existing_regional_maps = True,
                                                plot_the_daily_regional_maps = False)
