@@ -1,8 +1,10 @@
 import pandas as pd
 import multiprocessing
 
+import _0_data_downloading.utils
 from _0_data_downloading.utils import (download_satellite_data, merge_and_save_the_download_report,
-                                               remove_empty_folders, fill_the_sat_paths, plot_the_maps_in_the_folder)
+                                               remove_empty_folders, fill_the_sat_paths)
+
 
 from utils import (get_all_cases_to_process)
 
@@ -64,4 +66,4 @@ def Plot_and_Save_the_map(core_arguments,
                                                    local_path = True, 
                                                    dates = pd.date_range(start=init.start_day, end=init.end_day, freq="D"))
             
-            pool.map(plot_the_maps_in_the_folder, paths_to_sat_data)
+            pool.map(_0_data_downloading.utils.plot_the_maps_in_the_folder, paths_to_sat_data)

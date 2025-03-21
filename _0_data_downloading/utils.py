@@ -320,12 +320,12 @@ def download_L2_maps_from_EUMDAC(info, where_to_save_satellite_data, min_lon, ma
         collection_names = {"Processed" : {"Dates" : [pd.to_datetime('2017-07-05'), pd.Timestamp.now()],
                                            "Collection_name" : "EO:EUM:DAT:0412"}, 
                             "Re-Processed" : {"Dates" : [ pd.to_datetime('2016-04-18'), pd.to_datetime('2018-04-04') ],
-                                              "Colletion_name" : "EO:EUM:DAT:0582"}} # list of collections here : https://api.eumetsat.int/data/browse/1.0.0/collections?format=html
+                                              "Collection_name" : "EO:EUM:DAT:0582"}} # list of collections here : https://api.eumetsat.int/data/browse/1.0.0/collections?format=html
     else : 
         collection_names = {"Processed" : {"Dates" : [pd.to_datetime('2017-07-05'), pd.Timestamp.now()],
                                            "Collection_name" : "EO:EUM:DAT:0407"}, 
                             "Re-Processed" : {"Dates" : [ pd.to_datetime('2016-04-25'), pd.to_datetime('2021-04-28') ],
-                                              "Colletion_name" : "EO:EUM:DAT:0556"}} # list of collections here : https://api.eumetsat.int/data/browse/1.0.0/collections?format=html
+                                              "Collection_name" : "EO:EUM:DAT:0556"}} # list of collections here : https://api.eumetsat.int/data/browse/1.0.0/collections?format=html
 
     collection_names = adjust_collection_names_to_start_and_end_dates(collection_names, 
                                                                       np.min(dates_to_download), 
@@ -355,7 +355,6 @@ def download_L2_maps_from_EUMDAC(info, where_to_save_satellite_data, min_lon, ma
     for collection_name in collection_names.values() :
         
         # print(collection_name['Dates'])
-        
         command_to_download_data = f'eumdac download -c {collection_name["Collection_name"]} --yes --start {collection_name["Dates"][0].strftime("%Y-%m-%dT%H:%M")} --end {collection_name["Dates"][1].strftime("%Y-%m-%dT%H:%M")} --bbox {min_lon} {min_lat} {max_lon} {max_lat} --filename "{Sensor_name}*2*{Type}*" --entry ' + f'{" ".join([ f"*{var}*" for var in Variables_to_download])}'
             
         # command_to_activate_the_permissions_to_download = 'curl -k -d "grant_type=client_credentials" \
@@ -756,7 +755,8 @@ def extract_values_from_one_global_file(formatted_dates, report_index, date_to_e
         where_to_save_values_of_the_file = where_to_save_values[ np.where( date_to_extract == formatted_dates )[0][0] ]
         os.makedirs(where_to_save_values_of_the_file, exist_ok=True)
         map_ini.to_netcdf(f"{where_to_save_values_of_the_file}/{var_name}.nc",
-                                encoding={map_ini[var_name].name: {"zlib": True, "complevel": 4, "dtype": "float32"}})
+                                encoding={map_ini[var_name].name: {"zlib": True, "complevel": 4, "dtype": "float32"}},
+                                engine = 'netcdf4')
         download_report.loc[date_to_extract,'Message'] = f"✅ Downloaded and Extracted: {var_name}.nc"
         return download_report.loc[date_to_extract]
         

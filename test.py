@@ -18,7 +18,7 @@ sys.path.append(path_to_RIOMAR_package)
 
 import myRIOMAR_dev as myRIOMAR
 
-import multiprocessing, matplotlib 
+import multiprocessing, matplotlib
 
 # Set matplotlib backend to prevent plots from displaying
 # mpl.use('module://matplotlib_inline.backend_inline') # To show plots on the Plot panel (be careful as it consumes RAM memory !)
@@ -29,7 +29,7 @@ matplotlib.use('agg') # Prevent showing plot in the Plot panel (this saves RAM m
 # =============================================================================    
 
 core_arguments = {  'Data_sources': ['SEXTANT'],
-                    'Sensor_names':["merged"],
+                    'Sensor_names':["modis", "merged"],
                     'Satellite_variables':['CHLA'],
                     'Atmospheric_corrections':["polymer"],
                     'Temporal_resolution': ["DAILY"],
@@ -38,7 +38,7 @@ core_arguments = {  'Data_sources': ['SEXTANT'],
 
 
 myRIOMAR._0_data_downloading.Download_satellite_data(core_arguments,
-                                                     nb_of_cores_to_use = 1,
+                                                     nb_of_cores_to_use = 2,
                                                      overwrite_existing_satellite_files = False,
                                                      where_to_save_satellite_data = "/home/terrats/Desktop/RIOMAR/TEST/SATELLITE_DATA/")
 
@@ -46,7 +46,7 @@ myRIOMAR._0_data_downloading.Plot_and_Save_the_map(core_arguments,
                                                    nb_of_cores_to_use = 6,
                                                    where_are_saved_satellite_data = "/home/terrats/Desktop/RIOMAR/TEST/SATELLITE_DATA/",
                                                    start_day_of_maps_to_plot = '2018/07/31',
-                                                   end_day_of_maps_to_plot = '2018/08/01')
+                                                   end_day_of_maps_to_plot = '2018/08/05')
 
 myRIOMAR._1_data_validation.Match_up_with_insitu_measurements(core_arguments, 
                                                               redo_the_MU_database = False, 
