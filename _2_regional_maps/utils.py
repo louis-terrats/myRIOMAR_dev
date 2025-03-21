@@ -23,7 +23,7 @@ from utils import (load_file, align_bathymetry_to_resolution, degrees_to_km, fin
 def Process_each_week(Year_month_week_pattern, 
                       where_to_save_data_extended, all_days_of_the_year, suffix_ranges, info, 
                       map_files, files_have_been_processed,
-                      plot_the_daily_maps) :
+                      save_map_plots_of_which_time_frequency) :
 
     """
     Process satellite data files for each week and generate summary outputs.
@@ -72,7 +72,8 @@ def Process_each_week(Year_month_week_pattern,
     map_files_of_the_week = sorted( [x for x in map_files if any([pattern in x for pattern in Year_month_week_days])] )
         
     # Load files and extract key data
-    weekly_results = [load_file_and_extract_key_data(nc_file, info, where_to_save_data_extended.replace('[TIME_FREQUENCY]', 'DAILY'), plot_the_daily_maps) 
+    weekly_results = [load_file_and_extract_key_data(nc_file, info, where_to_save_data_extended.replace('[TIME_FREQUENCY]', 'DAILY'), 
+                                                     save_map_plots_of_which_time_frequency['DAILY']) 
                       for nc_file in map_files_of_the_week]
 
     # # Handle SEXTANT merged data specific computations
@@ -115,7 +116,7 @@ def Process_each_week(Year_month_week_pattern,
                                 [{'Basin_map' : x[1], 'Embouchure_map' : x[2],'Bloom_map' : x[3]} for x in weekly_results],
                                 info,
                                 Year_month_week_pattern[4:], Year_month_week_pattern[4:],
-                                "WEEKLY", False, date_of_the_weekly_map) 
+                                "WEEKLY", save_map_plots_of_which_time_frequency['WEEKLY'], date_of_the_weekly_map) 
     
     del weekly_results
     gc.collect()
@@ -1088,7 +1089,7 @@ class Create_and_save_the_maps :
     A class for creating and saving satellite maps at different temporal resolutions (weekly, monthly, annual).
     """
         
-    def __init__(self, working_directory, where_to_save_satellite_data, info) :
+    def __init__(self, where_to_save_regional_maps, where_are_saved_satellite_data, info) :
         
         """
         Initialize the Create_and_save_the_maps object.
@@ -1097,7 +1098,7 @@ class Create_and_save_the_maps :
         ----------
         working_directory : str
             Working directory where data will be saved.
-        where_to_save_satellite_data : str
+        where_are_saved_satellite_data : str
             Path to the satellite data files.
         info : object
             Metadata about the satellite data (e.g., zone, data source, sensor name, year).
@@ -1105,7 +1106,7 @@ class Create_and_save_the_maps :
                 
         # Define where to save processed data and time series data
         where_to_save_data = fill_the_sat_paths(info, 
-                                               path_to_fill_to_where_to_save_satellite_files(working_directory + 'RESULTS/' + info.Zone).replace('[TIME_FREQUENCY]', ''),
+                                               path_to_fill_to_where_to_save_satellite_files(where_to_save_regional_maps + '/' + info.Zone).replace('[TIME_FREQUENCY]', ''),
                                                local_path = True).replace('/*/*/*', '')
         
         where_to_save_timeseries_data = f'{where_to_save_data}/TIME_SERIES/'
@@ -1114,11 +1115,11 @@ class Create_and_save_the_maps :
         # Find satellite data files for the current and previous years
         if isinstance(info['Year'], str) and (info['Year'] == 'MULTIYEAR') : 
             
-            all_days_of_the_year = pd.date_range(start=info.date_min, end=info.date_max, freq="Y").strftime("%Y%m%d").tolist()
+            all_days_of_the_year = pd.date_range(start=info.date_min, end=info.date_max, freq="YE").strftime("%Y%m%d").tolist()
 
             map_files = find_sat_data_files(info, 
                                             fill_the_sat_paths(info, 
-                                                               (path_to_fill_to_where_to_save_satellite_files(f'{working_directory}/RESULTS/{info.Zone}').replace('/[MONTH]/[DAY]', '').replace('[TIME_FREQUENCY]', 'MAPS/[TIME_FREQUENCY]')), 
+                                                               (path_to_fill_to_where_to_save_satellite_files(f'{where_to_save_regional_maps}/{info.Zone}').replace('/[MONTH]/[DAY]', '').replace('[TIME_FREQUENCY]', 'MAPS/[TIME_FREQUENCY]')), 
                                                                local_path=True, 
                                                                dates= all_days_of_the_year))
             
@@ -1135,7 +1136,7 @@ class Create_and_save_the_maps :
         
         map_files = find_sat_data_files(info, 
                                         fill_the_sat_paths(info, 
-                                                           path_to_fill_to_where_to_save_satellite_files(where_to_save_satellite_data), 
+                                                           path_to_fill_to_where_to_save_satellite_files(where_are_saved_satellite_data), 
                                                            local_path=True, 
                                                            dates= all_days_of_the_year))            
             
@@ -1175,7 +1176,7 @@ class Create_and_save_the_maps :
         
         
         
-    def _1_create_weekly_maps(self, nb_of_cores_to_use, plot_the_daily_maps) :
+    def _1_create_weekly_maps(self, nb_of_cores_to_use, save_map_plots_of_which_time_frequency) :
         
         """
         Create weekly maps by processing daily satellite files.
@@ -1200,7 +1201,7 @@ class Create_and_save_the_maps :
                                                            self.suffix_ranges, self.info, 
                                                            self.map_files, 
                                                            self.files_have_been_processed,
-                                                           plot_the_daily_maps) 
+                                                           save_map_plots_of_which_time_frequency) 
                                                        for Year_month_week_pattern in self.Year_month_week_patterns ])
                 
         # to_remove = []
@@ -1235,7 +1236,7 @@ class Create_and_save_the_maps :
         del results_ts, files_have_been_processed_results, results
         gc.collect()
 
-    def _2_create_monthly_maps(self, nb_of_cores_to_use) :
+    def _2_create_monthly_maps(self, nb_of_cores_to_use, save_map_plots_of_which_time_frequency) :
 
         """
         Create monthly maps by averaging weekly maps.
@@ -1257,11 +1258,11 @@ class Create_and_save_the_maps :
                         [( folder_where_to_save_maps, 
                            load_the_climatological_files(self.where_to_save_data_extended.replace('[TIME_FREQUENCY]', "WEEKLY"), month_nb),
                            self.info,
-                           f'{month_nb:02d}', f'{month_nb:02d}', 'MONTHLY', True,
+                           f'{month_nb:02d}', f'{month_nb:02d}', 'MONTHLY', save_map_plots_of_which_time_frequency['MONTHLY'],
                            f'{self.info.Year}{month_nb:02d}15') for month_nb in (np.arange(12)+1) ])
         
         
-    def _3_create_annual_maps(self) :
+    def _3_create_annual_maps(self, save_map_plots_of_which_time_frequency) :
         
         """
         Create an annual map by averaging monthly maps.
@@ -1274,7 +1275,7 @@ class Create_and_save_the_maps :
                                       load_the_climatological_files(self.where_to_save_data_extended.replace('[TIME_FREQUENCY]', "MONTHLY")),
                                         self.info,
                                         period_name = 'the year', climatological_subfolder = 'ANNUAL', 
-                                        do_the_plot = True,
+                                        do_the_plot = save_map_plots_of_which_time_frequency['ANNUAL'],
                                         date_for_plot = f'{self.info.Year}0701') 
         
     def _4_create_the_multiyear_map(self) :
@@ -1298,10 +1299,10 @@ class Create_and_save_the_maps :
 
 class QC_maps :
     
-    def __init__(self, info, working_directory) :
+    def __init__(self, info, where_are_saved_regional_maps) :
         
         were_are_data_stored = fill_the_sat_paths(info, 
-                                               path_to_fill_to_where_to_save_satellite_files(working_directory + 'RESULTS/' + info.Zone).replace('[TIME_FREQUENCY]', ''),
+                                               path_to_fill_to_where_to_save_satellite_files(where_are_saved_regional_maps + '/' + info.Zone).replace('[TIME_FREQUENCY]', ''),
                                                local_path = True).replace('/*/*/*', 'MAPS')
                 
         # Find satellite data files for the current year
@@ -1311,18 +1312,24 @@ class QC_maps :
         multiannual_file = load_the_climatological_files(where_to_save_data_extended = were_are_data_stored + '/MULTIYEAR/', 
                                                          return_file_names = True)
         
+        where_to_save_QC_data = fill_the_sat_paths(info, 
+                                               path_to_fill_to_where_to_save_satellite_files(where_are_saved_regional_maps + '/' + info.Zone).replace('[TIME_FREQUENCY]', 'QC'),
+                                               local_path = True).replace('/*/*/*', '')
+        os.makedirs(where_to_save_QC_data, exist_ok=True)
+        
         self.QC_data = None
         self.QC_plot = None
         self.coastal_waters_mask = None
         self.info = info
-        self.working_directory = working_directory
+        self.where_are_saved_regional_maps = where_are_saved_regional_maps
         self.map_files = map_files
         self.multiannual_file = multiannual_file
         self.were_are_data_stored = were_are_data_stored
+        self.where_to_save_QC_data = where_to_save_QC_data
         
     def compute_mask_for_coastal_waters(self, minimal_bathymetry_in_m = 0, minimal_distance_from_land_in_km = 0) : 
         
-        path_to_the_mask = f'{self.were_are_data_stored.split(self.info.Data_source)[0]}/self.info.Data_source/Coastal_mask_min_bathy_is_{minimal_bathymetry_in_m}m_min_dist_from_land_is_{minimal_distance_from_land_in_km}km_for_{self.info.atmospheric_correction}.nc'
+        path_to_the_mask = f'{self.were_are_data_stored.split(self.info.Data_source)[0]}/{self.info.Data_source}/Coastal_mask_min_bathy_is_{minimal_bathymetry_in_m}m_min_dist_from_land_is_{minimal_distance_from_land_in_km}km_for_{self.info.atmospheric_correction}.nc'
         
         if os.path.isfile( path_to_the_mask ) :
             
@@ -1339,7 +1346,7 @@ class QC_maps :
         the_annual_map = load_file(self.multiannual_file[0])['Basin_map']['map_data']
                 
         bathymetry_data_aligned_to_map_resolution = align_bathymetry_to_resolution(the_annual_map, 
-                                                                                f'{self.working_directory}/RESULTS/{self.info.Zone}/Bathy_data.pkl')
+                                                                                f'{self.where_are_saved_regional_maps}/{self.info.Zone}/Bathy_data.pkl')
         
         bathymetric_mask = bathymetry_data_aligned_to_map_resolution > -minimal_bathymetry_in_m
 
@@ -1407,13 +1414,13 @@ class QC_maps :
         
         self.QC_plot = plot_and_save_the_QC_metrics(QC_df = QC_metrics_df, 
                                                      metrics_to_plot = ["mean_value", "99th_Percentile", "Lognorm_shape", "n_outliers"], 
-                                                     path_to_save_QC_files = f'{self.working_directory}/RESULTS/{self.info.Zone}/{self.info.Data_source}/{self.info.sensor_name}/{self.info.atmospheric_correction}/{self.info.Year}/MAPS/{self.info.Satellite_variable}/',
+                                                     path_to_save_QC_files = self.where_to_save_QC_data,
                                                      info = self.info,
                                                      max_cloud_cover = 80)
         
     def combine_QC_metrics(self) : 
                 
-        QC_files = glob.glob(f'{self.working_directory}/RESULTS/{self.info.Zone}/{self.info.Data_source}/{self.info.sensor_name}/{self.info.atmospheric_correction}/{self.info.Year}/MAPS/{self.info.Satellite_variable}/QC_daily_maps.csv')
+        QC_files = glob.glob(f'{self.where_are_saved_regional_maps}/{self.info.Zone}/{self.info.Data_source}/{self.info.sensor_name}/{self.info.atmospheric_correction}/{self.info.Year}/MAPS/{self.info.Satellite_variable}/QC_daily_maps.csv')
         
         Global_QC_metrics = pd.concat( [pd.read_csv(file_name) for file_name in QC_files] )
         
@@ -1423,7 +1430,7 @@ class QC_maps :
         
         self.Global_QC_plot = plot_and_save_the_QC_metrics(QC_df = Global_QC_metrics, 
                                                      metrics_to_plot = ["mean_value", "99th_Percentile", "Lognorm_shape", "n_outliers"], 
-                                                     path_to_save_QC_files = f'{self.working_directory}/RESULTS/{self.info.Zone}/{self.info.Data_source}/{self.info.sensor_name}/{self.info.atmospheric_correction}/',
+                                                     path_to_save_QC_files = self.where_to_save_QC_data,
                                                      info = self.info,
                                                      max_cloud_cover = 80)
             

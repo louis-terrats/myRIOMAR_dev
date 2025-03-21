@@ -6,7 +6,8 @@ from _2_regional_maps.utils import Create_and_save_the_maps, QC_maps, get_all_po
 from utils import (store_arguments, unique_years_between_two_dates)
 
 
-def create_regional_maps(arguments, Zones, overwrite_existing_regional_maps, plot_the_daily_regional_maps) :
+def create_regional_maps(core_arguments, Zones, overwrite_existing_regional_maps, save_map_plots_of_which_time_frequency, nb_of_cores_to_use,
+                         where_are_saved_satellite_data, where_to_save_regional_maps) :
             
     core_arguments.update({'Years' : unique_years_between_two_dates(core_arguments['start_day'], core_arguments['end_day']),
                            'Zones' : Zones})
@@ -16,27 +17,27 @@ def create_regional_maps(arguments, Zones, overwrite_existing_regional_maps, plo
     for i, info in cases_to_process.iterrows() : 
                 
         # info = cases_to_process.iloc[i]
-        info = pd.concat([info, pd.Series([start_day if info.Year == Years[0] else f'{info.Year}/01/01',
-                                           end_day if info.Year == Years[-1] else f'{info.Year}/12/31'],
+        info = pd.concat([info, pd.Series([core_arguments['start_day'] if info.Year == core_arguments['Years'][0] else f'{info.Year}/01/01',
+                                           core_arguments['end_day'] if info.Year == core_arguments['Years'][-1] else f'{info.Year}/12/31'],
                                           index = ['date_min', 'date_max'])])
         
         print(f'{i} over {cases_to_process.shape[0]-1} ({info.Zone} / {info.Data_source} / {info.sensor_name} / {info.atmospheric_correction} / {info.Year} / {info.Satellite_variable})')
         
-        maps_creation = Create_and_save_the_maps(working_directory, where_to_save_satellite_data, info) 
+        maps_creation = Create_and_save_the_maps(where_to_save_regional_maps, where_are_saved_satellite_data, info) 
         
         if ('map_files' not in vars(maps_creation)) or len(maps_creation.map_files) == 0 : 
-            print(f"No satellite file here : {where_to_save_satellite_data}/{info.Data_source}/' - Switch to the next iterate")
+            print(f"No satellite file here : {where_are_saved_satellite_data}/{info.Data_source}/' - Switch to the next iterate")
             continue
         
         if maps_creation.are_the_maps_already_produced and (overwrite_existing_regional_maps == False) : 
             print("Maps already exist - Switch to the next iterate")
             continue       
         
-        maps_creation._1_create_weekly_maps(nb_of_cores_to_use, plot_the_daily_regional_maps)
+        maps_creation._1_create_weekly_maps(nb_of_cores_to_use, save_map_plots_of_which_time_frequency)
         
-        maps_creation._2_create_monthly_maps(nb_of_cores_to_use)
+        maps_creation._2_create_monthly_maps(nb_of_cores_to_use, save_map_plots_of_which_time_frequency)
         
-        maps_creation._3_create_annual_maps()
+        maps_creation._3_create_annual_maps(save_map_plots_of_which_time_frequency)
         
     global_cases_to_process = cases_to_process.drop(['Year'], axis = 1).drop_duplicates()
         
@@ -44,37 +45,20 @@ def create_regional_maps(arguments, Zones, overwrite_existing_regional_maps, plo
         
         # info = global_cases_to_process.iloc[i].copy()
         info['Year'] = 'MULTIYEAR'
-        info = pd.concat([info, pd.Series([start_day, end_day], index = ['date_min', 'date_max'])])
+        info = pd.concat([info, pd.Series([core_arguments['start_day'], core_arguments['end_day']], index = ['date_min', 'date_max'])])
         
-        maps_creation = Create_and_save_the_maps(working_directory, where_to_save_satellite_data, info) 
+        maps_creation = Create_and_save_the_maps(where_to_save_regional_maps, where_are_saved_satellite_data, info) 
         
         maps_creation._4_create_the_multiyear_map()
         
 
         
-def QC_of_regional_maps(arguments) : 
+def QC_of_regional_maps(core_arguments, Zones, nb_of_cores_to_use, where_are_saved_regional_maps) : 
     
-    (Data_sources, 
-     Sensor_names, 
-     Satellite_variables, 
-     Atmospheric_corrections,
-     Temporal_resolution, 
-     start_day, end_day, 
-     working_directory, 
-     where_to_save_satellite_data, 
-     overwrite_existing_satellite_files,
-     redo_the_MU_database,
-     path_to_SOMLIT_insitu_data,
-     path_to_REPHY_insitu_data,
-     Zones,
-     overwrite_existing_regional_maps,
-     plot_the_daily_regional_maps,
-     nb_of_cores_to_use) = store_arguments(arguments, return_arguments = True)
+    core_arguments.update({'Years' : unique_years_between_two_dates(core_arguments['start_day'], core_arguments['end_day']),
+                           'Zones' : Zones})
     
-    Years = unique_years_between_two_dates(start_day, end_day)
-                                            
-    cases_to_process = get_all_possibilities(Zones, Data_sources, Sensor_names, Atmospheric_corrections, 
-                                             Years, Satellite_variables)
+    cases_to_process = get_all_possibilities(core_arguments)
     
     for i, info in cases_to_process.iterrows() :  
                 
@@ -82,7 +66,7 @@ def QC_of_regional_maps(arguments) :
         
         print(f'{i} over {cases_to_process.shape[0]-1} ({info.Zone} / {info.Data_source} / {info.sensor_name} / {info.atmospheric_correction} / {info.Year} / {info.Satellite_variable})')
         
-        QC_data_and_plots = QC_maps(info, working_directory)
+        QC_data_and_plots = QC_maps(info, where_are_saved_regional_maps)
         
         if len(QC_data_and_plots.map_files) == 0 : 
             print("No satellite regional maps - Switch to the next iterate")
@@ -108,7 +92,7 @@ def QC_of_regional_maps(arguments) :
         
         # print(f'{i} over {global_cases_to_process.shape[0]-1} ({info.Zone} / {info.Data_source} / {info.sensor_name} / {info.atmospheric_correction} / {info.Satellite_variable})')
        
-        QC_data_and_plots = QC_maps(info, working_directory)
+        QC_data_and_plots = QC_maps(info, where_are_saved_regional_maps)
                
         if len(QC_data_and_plots.map_files) == 0 : 
             continue

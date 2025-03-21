@@ -8,8 +8,8 @@ Created on Wed Jan  8 12:41:48 2025
 #%% Import libraries
 
 # working_directory = "/data/home/terrats/" # '/data/home/terrats/' # on rs-pro machine  
-# path_to_RIOMAR_package = "/home/terrats/Desktop/RIOMAR/PACKAGE/myRIOMAR_dev"
-path_to_RIOMAR_package = "/media/shared_storage/Documents/CODING/PROJECTS/myRIOMAR_dev"
+path_to_RIOMAR_package = "/home/terrats/Desktop/RIOMAR/PACKAGE/myRIOMAR_dev"
+# path_to_RIOMAR_package = "/media/shared_storage/Documents/CODING/PROJECTS/myRIOMAR_dev"
 
 import sys
 sys.path.append(path_to_RIOMAR_package)
@@ -25,24 +25,24 @@ matplotlib.use('agg') # Prevent showing plot in the Plot panel (this saves RAM m
 
 #%% Set core parameters
 core_arguments = {  'Data_sources': ['SEXTANT'], # ODATIS / SEXTANT / EUMETSAT
-                    'Sensor_names':["merged", "modis"], 
-                    'Satellite_variables':['CHLA', 'SPM'], 
+                    'Sensor_names':["merged"], 
+                    'Satellite_variables':['CHLA'], 
                     'Atmospheric_corrections':["Standard"], # Standard (SEXTANT / EUMETSAT) /  ...
                     'Temporal_resolution': ["DAILY"], # A enlever ! 
-                    'start_day' : '2018/07/31',
-                    'end_day' : '2018/08/01'}
+                    'start_day' : '2018/01/01',
+                    'end_day' : '2018/12/31'}
 
 #%% Downlaod data
 
 myRIOMAR._0_data_downloading.Download_satellite_data(core_arguments,
                                                      nb_of_cores_to_use = 1,
                                                      overwrite_existing_satellite_files = False,
-                                                     where_to_save_satellite_data = "/media/shared_storage/Documents/CODING/TEST/SATELLITE_DATA")
+                                                     where_to_save_satellite_data = "/home/terrats/Desktop/RIOMAR/TEST/SATELLITE_DATA")
 
 #%% Downlaod data
 myRIOMAR._0_data_downloading.Plot_and_Save_the_map(core_arguments,
                                                    nb_of_cores_to_use = 6,
-                                                   where_are_saved_satellite_data = "/media/shared_storage/Documents/CODING/TEST/SATELLITE_DATA",
+                                                   where_are_saved_satellite_data = "/home/terrats/Desktop/RIOMAR/TEST/SATELLITE_DATA",
                                                    start_day_of_maps_to_plot = '2018/07/31',
                                                    end_day_of_maps_to_plot = '2018/08/01')
 
@@ -59,18 +59,28 @@ myRIOMAR._1_data_validation.Match_up_with_insitu_measurements(core_arguments,
 #%%
 
 myRIOMAR._2_regional_maps.create_regional_maps(core_arguments,
-                                               Zones = ['BAY_OF_BISCAY', 'BAY_OF_SEINE', 'GULF_OF_LION'],
+                                               Zones = ['GULF_OF_LION'],
                                                overwrite_existing_regional_maps = True,
-                                               plot_the_daily_regional_maps = False)
+                                               save_map_plots_of_which_time_frequency = {'DAILY' : False, 'WEEKLY' : False, 'MONTHLY' : True, 'ANNUAL' : True},
+                                               nb_of_cores_to_use = 6,
+                                               where_are_saved_satellite_data = "/home/terrats/Desktop/RIOMAR/TEST/SATELLITE_DATA",
+                                               where_to_save_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS")
+
 
 #%%
 
-# myRIOMAR._2_regional_maps.QC_of_regional_maps(arguments.update({'nb_of_cores_to_use' : 4,
-#                                                                  "Zones" : ['BAY_OF_BISCAY']}) or arguments)
+myRIOMAR._2_regional_maps.QC_of_regional_maps(core_arguments,
+                                               Zones = ['GULF_OF_LION'],
+                                               nb_of_cores_to_use = 6,
+                                               where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS")
 
+#%%
 
-myRIOMAR._3_plume_detection.apply_plume_mask(arguments.update({'nb_of_cores_to_use' : 4,
-                                                               'Temporal_resolution' : ['WEEKLY']}) or arguments)
+myRIOMAR._3_plume_detection.apply_plume_mask(core_arguments,
+                                             Zones = ['GULF_OF_LION'],
+                                             detect_plumes_on_which_temporal_resolution_data = 'WEEKLY',
+                                             nb_of_cores_to_use = 6,
+                                             where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS")
 
 # myRIOMAR.plume_detection.plot_time_series_of_plume_areas(work_dir = work_dir,
 #                                                      Zones = ['BAY_OF_SEINE'],
