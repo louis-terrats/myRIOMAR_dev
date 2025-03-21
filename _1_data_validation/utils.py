@@ -6,7 +6,7 @@ from utils import (add_array_to_dict, path_to_fill_to_where_to_save_satellite_fi
                             create_arborescence, find_sat_data_files,merge_dicts, get_empty_paths,
                             return_the_parameter_name_based_on_file_name, get_non_empty_paths,
                             extract_the_time_from_the_satellite_file, access_item_in_a_dictionnary, 
-                            extract_dataframes_iterative)
+                            extract_dataframes_iterative, load_csv_files_in_the_package_folder)
 import re, datetime, os, pickle, multiprocessing
 
 from joblib import dump, load
@@ -16,79 +16,83 @@ from joblib import dump, load
 #### Functions
 # =============================================================================
     
-def get_insitu_measurements(path_to_SOMLIT_insitu_data = None, path_to_REPHY_insitu_data = None) : 
+def get_insitu_measurements() : 
+        
+    # =============================================================================
+    #     SOMLIT
+    # =============================================================================
+        
+    QC_values_to_keep = [2,6,7]
+    Depth_threshold = 10    
+
+    SOMLIT_data = load_csv_files_in_the_package_folder(SOMLIT = True)
+    SOMLIT_data['SOURCE'] = 'SOMLIT'
+    SOMLIT_data["TIME"] = pd.to_datetime(SOMLIT_data["DATE"] + " " + SOMLIT_data["HEURE"], format="%Y-%m-%d %H:%M:%S")
+
+    # Keep data with good QC
+    QC_columns = SOMLIT_data.filter(regex='^q').columns.tolist()
+    var_names = [x[1:] for x in QC_columns]
     
-    SOMLIT_data_filtered = None; REPHY_data_filtered = None
+    for var_name in var_names : 
+        
+        mask = ~SOMLIT_data[f'q{var_name}'].isin(QC_values_to_keep)
+        
+        SOMLIT_data.loc[mask, var_name] = np.nan
     
-    if path_to_SOMLIT_insitu_data is not None : 
+    index_to_keep = np.where( SOMLIT_data['PROF_NUM'].astype(float) <= Depth_threshold )[0]
+    SOMLIT_data_filtered = (SOMLIT_data
+                            .iloc[index_to_keep]
+                            .rename(columns = {'T':'TEMP', 
+                                               'COP':'POC',
+                                               'MES': 'SPM',
+                                               'S': 'SAL',
+                                               'Site': 'SITE'})
+                            .loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME', 'TEMP', 'SAL', 'POC', 'SPM']])
     
-        QC_values_to_keep = [2,6,7]
-        Depth_threshold = 10    
+    # SOMLIT_stations = SOMLIT_data_filtered.loc[:,["ID_SITE", "Site", "DATE", "HEURE", "Latitude", "Longitude"]].drop_duplicates().reset_index(drop = True)
+
+    # =============================================================================
+    #     REPHY
+    # =============================================================================
+
+    var_names = ['CHLOROA', 'TURB', 'TURB-FNU', 'TEMP', 'SALI']
+    QC_values_to_keep = ['Bon']
+    Depth_threshold = 10
+
+    REPHY_data = load_csv_files_in_the_package_folder(REPHY = True)         
+    REPHY_data["TIME"] = pd.to_datetime(REPHY_data["Date"] + " " + REPHY_data["Heure"], format="%Y-%m-%d %H:%M:%S")
+    REPHY_data["Valeur_mesure"] = REPHY_data["Valeur_mesure"].str.replace(",", ".").astype(float)
+    REPHY_data['SOURCE'] = 'REPHY'
     
-        SOMLIT_data = (pd.read_csv(path_to_SOMLIT_insitu_data, sep = ";", header = 2).iloc[1:]
-                            .rename(columns = {'gpsLat*':'LATITUDE', 
-                                               'gpsLong*':'LONGITUDE',
-                                               'nomSite*':"Site"}))
-        SOMLIT_data['SOURCE'] = 'SOMLIT'
-        SOMLIT_data["TIME"] = pd.to_datetime(SOMLIT_data["DATE"] + " " + SOMLIT_data["HEURE"], format="%Y-%m-%d %H:%M:%S")
+    index_to_keep = np.where( np.isin( REPHY_data['Code.parametre'], var_names ) &
+                              np.isin( REPHY_data['Qualite.resultat'], QC_values_to_keep ) &
+                              (REPHY_data['Profondeur.metre'] <= Depth_threshold) )[0]
 
-        # Keep data with good QC
-        QC_columns = SOMLIT_data.filter(regex='^q').columns.tolist()
-        var_names = [x[1:] for x in QC_columns]
+    REPHY_data_filtered = ( REPHY_data
+                               .iloc[index_to_keep]
+                               .rename(columns = {'lat':'LATITUDE', 
+                                                  'lon':'LONGITUDE',
+                                                  'Region': 'REGION',
+                                                  'Code_point_Libelle':"SITE",
+                                                  'Qualite.resultat':'QC',
+                                                  'Code.parametre':'VARIABLE',
+                                                  'Valeur_mesure':'VALUE'})
+                               .loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME', 'VARIABLE', 'VALUE', 'QC']] 
+                               .pivot_table(index=['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME'], 
+                                            columns="VARIABLE", values="VALUE", aggfunc="mean")
+                               .rename(columns = {'CHLOROA':'CHLA', 
+                                                  'SALI':'SAL'})
+                               .reset_index(drop = False))
+    
+    REPHY_data_filtered['TURB_all'] = REPHY_data_filtered[["TURB-FNU", "TURB"]].mean(axis=1)
+    REPHY_data_filtered['TURB'] = REPHY_data_filtered['TURB']
+    REPHY_data_filtered = REPHY_data_filtered.drop(['TURB_all', 'TURB-FNU'], axis = 1)
         
-        for var_name in var_names : 
-            
-            mask = ~SOMLIT_data[f'q{var_name}'].isin(QC_values_to_keep)
-            
-            SOMLIT_data.loc[mask, var_name] = np.nan
-        
-        index_to_keep = np.where( SOMLIT_data['PROF_NUM'].astype(float) <= Depth_threshold )[0]
-        SOMLIT_data_filtered = (SOMLIT_data
-                                .iloc[index_to_keep]
-                                .rename(columns = {'T':'TEMP', 
-                                                   'COP':'POC',
-                                                   'MES': 'SPM',
-                                                   'S': 'SAL',
-                                                   'Site': 'SITE'})
-                                .loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME', 'TEMP', 'SAL', 'POC', 'SPM']])
-        
-        # SOMLIT_stations = SOMLIT_data_filtered.loc[:,["ID_SITE", "Site", "DATE", "HEURE", "Latitude", "Longitude"]].drop_duplicates().reset_index(drop = True)
-
-    if path_to_REPHY_insitu_data is not None : 
-
-        var_names = ['CHLOROA', 'TURB', 'TURB-FNU', 'TEMP', 'SALI']
-        QC_values_to_keep = ['Bon']
-        Depth_threshold = 10
-
-        REPHY_data = pd.read_csv(path_to_REPHY_insitu_data, sep = ";", header = 0, encoding="ISO-8859-1")            
-        REPHY_data["TIME"] = pd.to_datetime(REPHY_data["Date"] + " " + REPHY_data["Heure"], format="%Y-%m-%d %H:%M:%S")
-        REPHY_data["Valeur_mesure"] = REPHY_data["Valeur_mesure"].str.replace(",", ".").astype(float)
-        REPHY_data['SOURCE'] = 'REPHY'
-        
-        index_to_keep = np.where( np.isin( REPHY_data['Code.parametre'], var_names ) &
-                                  np.isin( REPHY_data['Qualite.resultat'], QC_values_to_keep ) &
-                                  (REPHY_data['Profondeur.metre'] <= Depth_threshold) )[0]
-
-        REPHY_data_filtered = ( REPHY_data
-                                   .iloc[index_to_keep]
-                                   .rename(columns = {'lat':'LATITUDE', 
-                                                      'lon':'LONGITUDE',
-                                                      'Region': 'REGION',
-                                                      'Code_point_Libelle':"SITE",
-                                                      'Qualite.resultat':'QC',
-                                                      'Code.parametre':'VARIABLE',
-                                                      'Valeur_mesure':'VALUE'})
-                                   .loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME', 'VARIABLE', 'VALUE', 'QC']] 
-                                   .pivot_table(index=['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME'], 
-                                                columns="VARIABLE", values="VALUE", aggfunc="mean")
-                                   .rename(columns = {'CHLOROA':'CHLA', 
-                                                      'SALI':'SAL'})
-                                   .reset_index(drop = False))
-        
-        REPHY_data_filtered['TURB_all'] = REPHY_data_filtered[["TURB-FNU", "TURB"]].mean(axis=1)
-        REPHY_data_filtered['TURB'] = REPHY_data_filtered['TURB']
-        REPHY_data_filtered = REPHY_data_filtered.drop(['TURB_all', 'TURB-FNU'], axis = 1)
-        
+    
+    # =============================================================================
+    #  MERGE ALL
+    # =============================================================================
+    
     INSITU_measurements = pd.concat([SOMLIT_data_filtered, REPHY_data_filtered], ignore_index = True)
     INSITU_measurements['DATE'] = INSITU_measurements['TIME'].dt.date.astype(str)
     INSITU_measurements['TIME'] = INSITU_measurements['TIME'].dt.time.astype(str)
@@ -274,8 +278,7 @@ class MU_database_processing :
             
     def Create_the_MU_database(self, where_are_saved_sat_files) : 
         
-        INSITU_data, INSITU_stations = get_insitu_measurements(path_to_SOMLIT_insitu_data, 
-                                                               path_to_REPHY_insitu_data)
+        INSITU_data, INSITU_stations = get_insitu_measurements()
 
         MU_data = {'STATIONS' : INSITU_stations,
                    'DATES' : np.unique(INSITU_data['DATE']),

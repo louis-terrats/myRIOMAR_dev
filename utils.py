@@ -6,7 +6,7 @@ Created on Wed Jan  8 12:31:44 2025
 @author: terrats
 """
 
-import sys, pickle, os, bathyreq, glob, datetime, pygadm
+import sys, pickle, os, bathyreq, glob, datetime, pygadm, importlib.resources
 from itertools import product, chain
 import pandas as pd
 import xarray as xr
@@ -466,3 +466,18 @@ def load_shapefile_data() :
 def extract_and_format_date_from_path(path):
     match = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', path)
     return ''.join(match.groups()) if match else None   
+
+def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False):
+    
+    if SOMLIT : 
+        with importlib.resources.open_text('myRIOMAR_dev._1_data_validation.INSITU_data.SOMLIT', 'Somlit.csv') as f:
+            return (pd.read_csv(f, sep = ";", header = 2).iloc[1:]
+                                .rename(columns = {'gpsLat*':'LATITUDE', 
+                                                   'gpsLong*':'LONGITUDE',
+                                                   'nomSite*':"Site"}))
+        
+    if REPHY : 
+        with importlib.resources.open_binary('myRIOMAR_dev._1_data_validation.INSITU_data.REPHY', 'Table1_REPHY_hydro_RIOMAR.csv.gz') as f:
+            return pd.read_csv(f, sep = ";", header = 0, encoding="ISO-8859-1", compression = {'method' : 'gzip'})
+    
+    
