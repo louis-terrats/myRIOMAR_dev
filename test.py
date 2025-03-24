@@ -25,19 +25,20 @@ matplotlib.use('agg') # Prevent showing plot in the Plot panel (this saves RAM m
 
 #%% Set core parameters
 core_arguments = {  'Data_sources': ['SEXTANT'], # ODATIS / SEXTANT / EUMETSAT
-                    'Sensor_names':["merged"], 
-                    'Satellite_variables':['CHLA'], 
+                    'Sensor_names':["merged", "modis"], 
+                    'Satellite_variables':['CHLA', 'SPM'], 
                     'Atmospheric_corrections':["Standard"], # Standard (SEXTANT / EUMETSAT) /  ...
                     'Temporal_resolution': ["DAILY"], # A enlever ! 
-                    'start_day' : '2018/01/01',
-                    'end_day' : '2018/12/31'}
+                    'start_day' : '1998/01/01',
+                    'end_day' : '2024/12/31'}
 
 #%% Downlaod data
 
 myRIOMAR._0_data_downloading.Download_satellite_data(core_arguments,
                                                      nb_of_cores_to_use = 1,
                                                      overwrite_existing_satellite_files = False,
-                                                     where_to_save_satellite_data = "/home/terrats/Desktop/RIOMAR/TEST/SATELLITE_DATA")
+                                                     # where_to_save_satellite_data = "/home/terrats/Desktop/RIOMAR/TEST/SATELLITE_DATA"
+                                                     where_to_save_satellite_data = "/media/terrats/My Book/LOUIS_TERRATS/DATA/OCEAN_COLOR/")
 
 #%% Downlaod data
 myRIOMAR._0_data_downloading.Plot_and_Save_the_map(core_arguments,
@@ -48,13 +49,18 @@ myRIOMAR._0_data_downloading.Plot_and_Save_the_map(core_arguments,
 
 #%%
 
-myRIOMAR._Add_my_zone(name = 'THAY', min_lat = 9, ...)
+myRIOMAR._Add_my_zone(name = 'THAY', min_lat = 9, max_lat = X)
 
 myRIOMAR._1_data_validation.Match_up_with_insitu_measurements(core_arguments, 
                                                               redo_the_MU_database = False, 
                                                               nb_of_cores_to_use = 6,
-                                                              where_to_save_Match_Up_data = "/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/",
-                                                              Zones = "THAU")
+                                                              where_are_saved_satellite_data = "/home/terrats/Desktop/RIOMAR/TEST/SATELLITE_DATA",
+                                                              where_to_save_Match_Up_data = "/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/")
+
+myRIOMAR._1_data_validation.Make_validation_plots_and_statistics(core_arguments, 
+                                                                  where_are_saved_Match_Up_data = "/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/",
+                                                                  nb_of_cores_to_use = 6)
+
 
 #%%
 

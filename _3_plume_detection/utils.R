@@ -66,13 +66,13 @@ make_the_plot_from_the_df <- function(data) {
   
 }
 
-work_dir = '/home/terrats/Desktop/RIOMAR/'
-Zone = 'BAY_OF_SEINE'
-Data_source = 'SEXTANT'
-Satellite_sensor = c('merged', 'modis')
-atmospheric_correction = 'Standard'
-Time_resolution = 'DAILY'
-Years = 2018:2021
+# work_dir = '/home/terrats/Desktop/RIOMAR/'
+# Zone = 'BAY_OF_SEINE'
+# Data_source = 'SEXTANT'
+# Satellite_sensor = c('merged', 'modis')
+# atmospheric_correction = 'Standard'
+# Time_resolution = 'DAILY'
+# Years = 2018:2021
 
 plot_time_series_of_plume_area_and_thresholds <- function(work_dir, Zone, Data_source, Satellite_sensor, atmospheric_correction, Time_resolution, Years) {
   

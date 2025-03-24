@@ -7,7 +7,7 @@ from utils import (add_array_to_dict, path_to_fill_to_where_to_save_satellite_fi
                             return_the_parameter_name_based_on_file_name, get_non_empty_paths,
                             extract_the_time_from_the_satellite_file, access_item_in_a_dictionnary, 
                             extract_dataframes_iterative, load_csv_files_in_the_package_folder)
-import re, datetime, os, pickle, multiprocessing
+import re, datetime, os, pickle, multiprocessing, gc
 
 from joblib import dump, load
 
@@ -97,6 +97,9 @@ def get_insitu_measurements() :
     INSITU_measurements['DATE'] = INSITU_measurements['TIME'].dt.date.astype(str)
     INSITU_measurements['TIME'] = INSITU_measurements['TIME'].dt.time.astype(str)
     
+    BGC_columns = ['TEMP', 'SAL', 'POC', 'SPM', 'CHLA', 'TURB']
+    INSITU_measurements[BGC_columns] = INSITU_measurements[BGC_columns].astype(float)
+    
     INSITU_stations = (INSITU_measurements
                        .groupby(["SOURCE", "SITE", "LATITUDE", "LONGITUDE"], as_index = False)
                        .agg({"DATE": list}))
@@ -120,7 +123,7 @@ def find_indices_of_the_grid(lat_station, lon_station, lat_map, lon_map, grid_si
 
 def do_the_match_up_for_one_date(satellite_date, satellite_files, MU_data, MU_database_of_the_case, 
                                  MU_stations, info,
-                                  grid_size, where_are_saved_sat_files) : 
+                                  grid_size, where_are_saved_satellite_data) : 
 
     date_pattern = re.compile(satellite_date)
     
@@ -131,11 +134,12 @@ def do_the_match_up_for_one_date(satellite_date, satellite_files, MU_data, MU_da
     for satellite_file in satellite_files_of_the_day : 
     
         try : 
-            map_ini = xr.open_dataset(satellite_file, decode_times=True)
+            with xr.open_dataset(satellite_file, decode_times=True) as f : 
+                map_ini = f
         except Exception as e:
             
             add_array_to_dict(dictionary = MU_database_of_the_case,
-                              path = satellite_file.replace(f'{where_are_saved_sat_files}/', ''),
+                              path = satellite_file.replace(f'{where_are_saved_satellite_data}/', ''),
                               array = f"❌ Impossible to load the nc file {satellite_file} - Error : {e}")
             
             continue
@@ -145,7 +149,7 @@ def do_the_match_up_for_one_date(satellite_date, satellite_files, MU_data, MU_da
              (len(np.unique(map_ini.lon)) == 1) ) : 
             
             add_array_to_dict(dictionary = MU_database_of_the_case,
-                              path = satellite_file.replace(f'{where_are_saved_sat_files}/', ''),
+                              path = satellite_file.replace(f'{where_are_saved_satellite_data}/', ''),
                               array = f"❌ Wrong file format for {satellite_file}")
             # return 
             continue
@@ -156,10 +160,10 @@ def do_the_match_up_for_one_date(satellite_date, satellite_files, MU_data, MU_da
         
         MU_values = [
             map_ini.isel(lat=station_info['lat_index'], lon=station_info['lon_index'])[the_var_name].values.flatten()
-            if satellite_date_formatted in station_info['DATE'] else np.array([])
+            if satellite_date_formatted in station_info['DATE'] else np.array(["No in-situ measurement"])
             for _, station_info in MU_data['STATIONS'].iterrows()
         ]
-        
+                
         MU_values = pd.DataFrame(MU_values)
         MU_values.columns = [f"{i}_{j}" for i in range(1, grid_size+1) for j in range(1, grid_size+1)]     
         MU_values.index = pd.MultiIndex.from_frame(
@@ -167,23 +171,28 @@ def do_the_match_up_for_one_date(satellite_date, satellite_files, MU_data, MU_da
                                                                 pd.Series({'Satellite_algorithm' : return_the_parameter_name_based_on_file_name(satellite_file),
                                                                            'DATE' : satellite_date_formatted,
                                                                            'Satellite_time' : time_value})])))
-                 
-        map_ini.close()
+                         
+        MU_values = MU_values[ MU_values.iloc[:,0] != "No in-situ measurement" ]
         
-        add_array_to_dict(dictionary = MU_database_of_the_case,
-                          path = satellite_file.replace(f'{where_are_saved_sat_files}/', ''),
-                          array = MU_values)
+        if MU_values.shape[0] > 0 :
+            
+            add_array_to_dict(dictionary = MU_database_of_the_case,
+                              path = satellite_file.replace(f'{where_are_saved_satellite_data}/', ''),
+                              array = MU_values)
+        
+        del MU_values, map_ini
+        gc.collect()
             
     return MU_database_of_the_case
 
 
-def find_the_path_to_satellite_MU_in_the_dict(path_to_satellite_file, where_are_saved_sat_files) : 
+def find_the_path_to_satellite_MU_in_the_dict(path_to_satellite_file, where_are_saved_satellite_data) : 
     
     filename = path_to_satellite_file.split("/")[-1]
     
     # Extract parameter name (e.g., SPM-G)
     param = return_the_parameter_name_based_on_file_name(filename)
-    path_in_the_dict = path_to_satellite_file.replace(filename, param).replace(where_are_saved_sat_files, '')
+    path_in_the_dict = path_to_satellite_file.replace(filename, param).replace(where_are_saved_satellite_data, '')
     
     return path_in_the_dict
 
@@ -219,9 +228,21 @@ def compute_grid_stats(df, grid_size):
     # Compute mean and std using vectorized operations
     selected_data = df[list(cols_to_include)]
     return pd.DataFrame({f'{grid_size}x{grid_size}_mean': selected_data.mean(axis=1, skipna = True), 
+                         f'{grid_size}x{grid_size}_median': selected_data.median(axis=1, skipna = True), 
                          f'{grid_size}x{grid_size}_std': selected_data.std(axis=1, skipna = True),
                          f'{grid_size}x{grid_size}_n': selected_data.count(axis=1, numeric_only=True)})
 
+
+def get_the_corresponding_insitu_parameter_name(satellite_variable_name) : 
+    
+    if 'SPM' in satellite_variable_name : 
+        return 'SPM'
+    
+    if 'CHL' in satellite_variable_name : 
+        return 'CHLA'
+    
+    if 'SST' in satellite_variable_name : 
+        return 'TEMP'
 
 def Summarize_the_matchup_database(path, MU_database) : 
     
@@ -229,14 +250,14 @@ def Summarize_the_matchup_database(path, MU_database) :
     
     MU_summary_df = {size: compute_grid_stats(MU_values, size) for size in np.arange(1,9,2)}
     MU_summary_df = pd.DataFrame({key: value for res in MU_summary_df.values() for key, value in res.items()})
-    
-    var_name_map = {"SPM": "SPM", "CHL": "CHLA"}
-    var_name_in_INSITU_dtb = next((v for k, v in var_name_map.items() if k in path), None)
+        
+    var_name_in_INSITU_dtb = get_the_corresponding_insitu_parameter_name(path)
     
     INSITU_values = ( MU_database['INSITU']
                      .xs( MU_summary_df.index.get_level_values('DATE')[0], level = 'DATE')
                      .rename(columns={var_name_in_INSITU_dtb: 'Insitu_value'})
                      .rename_axis(index={'TIME': 'Insitu_time'})[['Insitu_value']] )
+    INSITU_values = INSITU_values.insert(0, 'Insitu_variable', var_name_in_INSITU_dtb)
     
     merged_df = (MU_summary_df.reset_index()
                  .merge(INSITU_values.reset_index(), 
@@ -250,13 +271,40 @@ def Summarize_the_matchup_database(path, MU_database) :
     
     return MU_summary
 
+
+
+def get_insitu_dates_for_each_parameter(INSITU_data) :
+
+    filtered_cols = INSITU_data.columns.difference(['SOURCE', 'SITE', "LATITUDE", "LONGITUDE", "DATE", "TIME"])  # Select relevant columns    
+    dates_with_finite_values = {col: np.unique( INSITU_data.loc[np.isfinite(INSITU_data[col]), "DATE"] ) for col in filtered_cols}
+    
+    return dates_with_finite_values
+
+def get_MU_criteria_for_each_product(info) : 
+        
+    if info.Data_source == 'SEXTANT' : 
+            
+        MU_criteria = {'min_n' : 1,
+                       'max_hour_diff_between_insitu_and_satellite_measurement' : 3 if info.sensor_name != "merged" else np.nan,
+                       'max_CV' : np.nan,
+                       'grid_size' : 1}
+        
+    else :
+        
+        MU_criteria = {'min_n' : 5,
+                       'max_hour_diff_between_insitu_and_satellite_measurement' : 3,
+                       'max_CV' : 30,
+                       'grid_size' : 3}
+    
+    return MU_criteria
+
 # =============================================================================
 #### Classes 
 # =============================================================================
 
 class MU_database_processing : 
     
-    def __init__(self, where_to_save_Match_Up_data, cases_to_process, nb_of_cores_to_use, redo_the_MU_database = False) :
+    def __init__(self, where_to_save_Match_Up_data, cases_to_process, nb_of_cores_to_use = 1, redo_the_MU_database = False) :
         
         grid_size = 9 # 9x9
         
@@ -276,18 +324,18 @@ class MU_database_processing :
         self.cases_to_process = cases_to_process
         self.nb_of_cores_to_use = nb_of_cores_to_use
             
-    def Create_the_MU_database(self, where_are_saved_sat_files) : 
+    def Create_the_MU_database(self, where_are_saved_satellite_data) : 
         
         INSITU_data, INSITU_stations = get_insitu_measurements()
 
         MU_data = {'STATIONS' : INSITU_stations,
-                   'DATES' : np.unique(INSITU_data['DATE']),
+                   'DATES' : get_insitu_dates_for_each_parameter(INSITU_data),
                    'INSITU' : INSITU_data.set_index(['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'DATE', 'TIME'])}
                    
         MU_stations = MU_data['STATIONS'].loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE']]
         
         MU_databases = [MU_data]
-        filled_base_path = path_to_fill_to_where_to_save_satellite_files(where_are_saved_sat_files)
+        filled_base_path = path_to_fill_to_where_to_save_satellite_files(where_are_saved_satellite_data)
         
         # Parallel processing with context manager
         # pool = multiprocessing.Pool(self.nb_of_cores_to_use)
@@ -302,9 +350,9 @@ class MU_database_processing :
                 filled_destination_path = fill_the_sat_paths(info = info, 
                                                              path_to_fill = filled_base_path, 
                                                              local_path = True,
-                                                             dates = MU_data['DATES'])
+                                                             dates = MU_data['DATES'][get_the_corresponding_insitu_parameter_name(info.Satellite_variable)])
                 
-                MU_database_of_the_case = create_arborescence( [x.replace(f'{where_are_saved_sat_files}/', '') for x in filled_destination_path] )
+                MU_database_of_the_case = create_arborescence( [x.replace(f'{where_are_saved_satellite_data}/', '') for x in filled_destination_path] )
                 
                 satellite_files = find_sat_data_files(info, path_to_sat_data = filled_destination_path)
                 if not satellite_files : 
@@ -325,7 +373,7 @@ class MU_database_processing :
                 MU_databases_of_the_case = pool.starmap(do_the_match_up_for_one_date, [(satellite_date, satellite_files, 
                                                                                 MU_data, MU_database_of_the_case, 
                                                                                 MU_stations, info,
-                                                                                self.grid_size, where_are_saved_sat_files) 
+                                                                                self.grid_size, where_are_saved_satellite_data) 
                                                            for satellite_date in satellite_dates ])
                 
                 MU_databases.append( merge_dicts( MU_databases_of_the_case ) ) 
@@ -336,7 +384,7 @@ class MU_database_processing :
         
         dump(self.MU_database, self.path_to_the_MU_database , compress=3)
         
-    def Complete_the_MU_database(self, where_are_saved_sat_files) : 
+    def Complete_the_MU_database(self, where_are_saved_satellite_data) : 
         
         paths_already_filled_in_the_database = set( get_non_empty_paths(self.MU_database) )
         MU_databases_to_add = []
@@ -346,7 +394,7 @@ class MU_database_processing :
         # Precompute filled paths to avoid redundant calculations
         filled_destination_paths = {
             i: fill_the_sat_paths(
-                info, path_to_fill_to_where_to_save_satellite_files(where_are_saved_sat_files),
+                info, path_to_fill_to_where_to_save_satellite_files(where_are_saved_satellite_data),
                 local_path=True, dates=self.MU_database['DATES']
             )
             for i, info in self.cases_to_process.iterrows()
@@ -366,7 +414,7 @@ class MU_database_processing :
                     continue     
                 
                 paths_to_process = pool.starmap(find_the_path_to_satellite_MU_in_the_dict, 
-                                                [(satellite_file, where_are_saved_sat_files) for satellite_file in satellite_files ])
+                                                [(satellite_file, where_are_saved_satellite_data) for satellite_file in satellite_files ])
     
                 index_to_process = np.where( ~ np.isin( paths_to_process, list(paths_already_filled_in_the_database) ) )[0]
                 if not len(index_to_process) :
@@ -391,7 +439,7 @@ class MU_database_processing :
                 MU_databases_of_the_case = pool.starmap(do_the_match_up_for_one_date, [(satellite_date, satellite_files, 
                                                                                 self.MU_database, MU_database_of_the_case, 
                                                                                 MU_stations, info,
-                                                                                self.grid_size, where_are_saved_sat_files) 
+                                                                                self.grid_size, where_are_saved_satellite_data) 
                                                            for satellite_date in satellite_dates ])
     
                 merged_MU_databases_of_the_case = merge_dicts( MU_databases_of_the_case )
@@ -410,7 +458,7 @@ class MU_database_processing :
     # def Perform_matchups
     def Summarize_MU_with_statistics(self) : 
 
-        paths_filled_in_the_database = set( [x for x in get_non_empty_paths(self.MU_database) if x.count('/') > 1] )
+        paths_filled_in_the_database = set( [x for x in get_non_empty_paths(self.MU_database) if x.count('/') > 2] )
                 
         with multiprocessing.Pool(self.nb_of_cores_to_use) as pool:
             MU_summaries = pool.starmap(Summarize_the_matchup_database, [(path, 
@@ -428,11 +476,23 @@ class MU_database_processing :
         
     def Compile_and_Save_MU_summary(self, Data_sources) :
         
-        MU_summary_df = {key: self.MU_summary[key] for key in Data_sources if key in self.MU_summary}
+        def process_data(data_dict):
+            df = {k: data_dict[k] for k in Data_sources if k in data_dict}
+            df = extract_dataframes_iterative(df)       
+            df = list(df)
+            return pd.concat(df)
+
+        MU_summary_df = process_data(self.MU_summary)
+        MU_database_df = process_data(self.MU_database).reindex(MU_summary_df.index)
+    
+        mask = np.isfinite(MU_summary_df.index.get_level_values('Insitu_value'))
+        MU_summary_df, MU_database_df = MU_summary_df[mask], MU_database_df[mask]
         
-        MU_summary_df = list( extract_dataframes_iterative(MU_summary_df) )
-        
-        pd.concat( MU_summary_df ).to_csv(self.path_to_the_MU_database.replace('database.joblib', 'summary.csv'))
-        
+        self.MU_summary_df = MU_summary_df
+        self.MU_database_df = MU_database_df
+    
+        base_path = self.path_to_the_MU_database.replace('database.joblib', '')
+        MU_database_df.to_csv(f"{base_path}database.csv")
+        MU_summary_df.to_csv(f"{base_path}summary.csv")
         
         
