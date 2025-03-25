@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 
+import rpy2.robjects as robjects
+
 from utils import (add_array_to_dict, path_to_fill_to_where_to_save_satellite_files, fill_the_sat_paths,
                             create_arborescence, find_sat_data_files,merge_dicts, get_empty_paths,
                             return_the_parameter_name_based_on_file_name, get_non_empty_paths,
@@ -47,7 +49,33 @@ def get_insitu_measurements() :
                                                'MES': 'SPM',
                                                'S': 'SAL',
                                                'Site': 'SITE'})
-                            .loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME', 'TEMP', 'SAL', 'POC', 'SPM']])
+                            .loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME', 'TEMP', 'SAL', 'CHLA', 'POC', 'SPM']])
+    
+    region_mapping = {
+        'Point B': 'Mer ligurienne - Corse',
+        'Frioul': 'Golfe du Lion', 
+        'Sete': 'Golfe du Lion', 
+        'Sola': 'Golfe du Lion',
+        'Comprian': 'Sud Golfe de Gascogne', 
+        'Eyrac': 'Sud Golfe de Gascogne', 
+        'Bouee 13': 'Sud Golfe de Gascogne',
+        'pk 30': 'Pays de la Loire - Pertuis', 
+        'pk 52': 'Pays de la Loire - Pertuis', 
+        'pk 86': 'Pays de la Loire - Pertuis', 
+        'Antioche': 'Pays de la Loire - Pertuis',
+        'Portzic': 'Bretagne Sud',
+        'Estacade': 'Manche occidentale', 
+        'Astan': 'Manche occidentale', 
+        'Bizeux': 'Manche occidentale', 
+        'Le Buron': 'Manche occidentale', 
+        'Cézembre': 'Manche occidentale',
+        'Smile': 'Baie de Seine', 
+        'Luc-sur-Mer': 'Baie de Seine',
+        'Point C': 'Manche orientale - Mer du Nord', 
+        'Point L': 'Manche orientale - Mer du Nord'
+    }
+    
+    SOMLIT_data_filtered['REGION'] = SOMLIT_data_filtered['SITE'].map(region_mapping).fillna('Region to fill')
     
     # SOMLIT_stations = SOMLIT_data_filtered.loc[:,["ID_SITE", "Site", "DATE", "HEURE", "Latitude", "Longitude"]].drop_duplicates().reset_index(drop = True)
 
@@ -77,8 +105,8 @@ def get_insitu_measurements() :
                                                   'Qualite.resultat':'QC',
                                                   'Code.parametre':'VARIABLE',
                                                   'Valeur_mesure':'VALUE'})
-                               .loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME', 'VARIABLE', 'VALUE', 'QC']] 
-                               .pivot_table(index=['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'TIME'], 
+                               .loc[:,['SOURCE', 'SITE', "REGION", 'LATITUDE', 'LONGITUDE', 'TIME', 'VARIABLE', 'VALUE', 'QC']] 
+                               .pivot_table(index=['SOURCE', 'SITE', "REGION", 'LATITUDE', 'LONGITUDE', 'TIME'], 
                                             columns="VARIABLE", values="VALUE", aggfunc="mean")
                                .rename(columns = {'CHLOROA':'CHLA', 
                                                   'SALI':'SAL'})
@@ -101,7 +129,7 @@ def get_insitu_measurements() :
     INSITU_measurements[BGC_columns] = INSITU_measurements[BGC_columns].astype(float)
     
     INSITU_stations = (INSITU_measurements
-                       .groupby(["SOURCE", "SITE", "LATITUDE", "LONGITUDE"], as_index = False)
+                       .groupby(["SOURCE", "SITE", "REGION", "LATITUDE", "LONGITUDE"], as_index = False)
                        .agg({"DATE": list}))
     # INSITU_stations = INSITU_measurements.loc[:,["SOURCE", "SITE", "LATITUDE", "LONGITUDE"]].drop_duplicates().reset_index(drop = True)
 
@@ -165,12 +193,15 @@ def do_the_match_up_for_one_date(satellite_date, satellite_files, MU_data, MU_da
         ]
                 
         MU_values = pd.DataFrame(MU_values)
-        MU_values.columns = [f"{i}_{j}" for i in range(1, grid_size+1) for j in range(1, grid_size+1)]     
-        MU_values.index = pd.MultiIndex.from_frame(
-                                MU_stations.assign(**pd.concat([info,
-                                                                pd.Series({'Satellite_algorithm' : return_the_parameter_name_based_on_file_name(satellite_file),
-                                                                           'DATE' : satellite_date_formatted,
-                                                                           'Satellite_time' : time_value})])))
+        
+        if MU_values.shape[1] > 1 : 
+                   
+            MU_values.columns = [f"{i}_{j}" for i in range(1, grid_size+1) for j in range(1, grid_size+1)]     
+            MU_values.index = pd.MultiIndex.from_frame(
+                                    MU_stations.assign(**pd.concat([info,
+                                                                    pd.Series({'Satellite_algorithm' : return_the_parameter_name_based_on_file_name(satellite_file),
+                                                                               'DATE' : satellite_date_formatted,
+                                                                               'Satellite_time' : time_value})])))
                          
         MU_values = MU_values[ MU_values.iloc[:,0] != "No in-situ measurement" ]
         
@@ -257,13 +288,13 @@ def Summarize_the_matchup_database(path, MU_database) :
                      .xs( MU_summary_df.index.get_level_values('DATE')[0], level = 'DATE')
                      .rename(columns={var_name_in_INSITU_dtb: 'Insitu_value'})
                      .rename_axis(index={'TIME': 'Insitu_time'})[['Insitu_value']] )
-    INSITU_values = INSITU_values.insert(0, 'Insitu_variable', var_name_in_INSITU_dtb)
+    INSITU_values.insert(0, 'Insitu_variable', var_name_in_INSITU_dtb)
     
     merged_df = (MU_summary_df.reset_index()
                  .merge(INSITU_values.reset_index(), 
                         on=list(set(MU_summary_df.index.names) & set(INSITU_values.index.names)), how='outer')
                  .set_index(list(set(MU_summary_df.index.names) | set(INSITU_values.index.names) | set(INSITU_values.columns)))
-                 .reorder_levels( list(MU_summary_df.index.names) + ['Insitu_time', 'Insitu_value'] ) )
+                 .reorder_levels( list(MU_summary_df.index.names) + ['Insitu_time', 'Insitu_variable', 'Insitu_value'] ) )
     
     MU_summary = create_arborescence( [path[1:]] )
 
@@ -275,7 +306,7 @@ def Summarize_the_matchup_database(path, MU_database) :
 
 def get_insitu_dates_for_each_parameter(INSITU_data) :
 
-    filtered_cols = INSITU_data.columns.difference(['SOURCE', 'SITE', "LATITUDE", "LONGITUDE", "DATE", "TIME"])  # Select relevant columns    
+    filtered_cols = INSITU_data.columns.difference(['SOURCE', 'SITE', 'REGION', "LATITUDE", "LONGITUDE", "DATE", "TIME"])  # Select relevant columns    
     dates_with_finite_values = {col: np.unique( INSITU_data.loc[np.isfinite(INSITU_data[col]), "DATE"] ) for col in filtered_cols}
     
     return dates_with_finite_values
@@ -297,6 +328,54 @@ def get_MU_criteria_for_each_product(info) :
                        'grid_size' : 3}
     
     return MU_criteria
+
+
+def scatterplot_and_save_statistics(MU_summary_df, info, where_are_saved_Match_Up_data) : 
+
+    index_to_keep = np.where((MU_summary_df.Data_source == info.Data_source) & 
+                             (MU_summary_df.sensor_name == info.sensor_name) & 
+                             (MU_summary_df.atmospheric_correction == info.atmospheric_correction) & 
+                             (MU_summary_df.Satellite_variable == info.Satellite_variable))
+    
+    MU_summary_df_of_the_case = MU_summary_df.iloc[index_to_keep]
+    
+    MU_criteria = get_MU_criteria_for_each_product(info)
+    
+    # Source the R script
+    robjects.r['source']("myRIOMAR_dev/_1_data_validation/utils.R")
+
+    r_function = robjects.r['Save_validation_scatterplots_and_stats']
+    
+    for satellite_algorithm in np.unique(MU_summary_df_of_the_case.Satellite_algorithm) : 
+        
+        MU_summary_df_of_the_sat_algo = MU_summary_df_of_the_case[ MU_summary_df_of_the_case.Satellite_algorithm == satellite_algorithm ]
+                
+        # MU_summary_df_of_the_sat_algo = MU_summary_df_of_the_sat_algo.iloc[:100]
+        
+        # Call the R function
+        r_function(
+            
+            satellite_median = robjects.FloatVector(MU_summary_df_of_the_sat_algo[f'{MU_criteria["grid_size"]}x{MU_criteria["grid_size"]}_mean'].to_list()),
+            satellite_n = robjects.IntVector(MU_summary_df_of_the_sat_algo[f'{MU_criteria["grid_size"]}x{MU_criteria["grid_size"]}_n'].to_list()),
+            satellite_sd = robjects.FloatVector(MU_summary_df_of_the_sat_algo[f'{MU_criteria["grid_size"]}x{MU_criteria["grid_size"]}_std'].to_list()),
+            satellite_times = robjects.StrVector(MU_summary_df_of_the_sat_algo.Satellite_time.astype(str).to_list()),
+            insitu_value = robjects.FloatVector(MU_summary_df_of_the_sat_algo.Insitu_value.to_list()),
+            insitu_time = robjects.StrVector(MU_summary_df_of_the_sat_algo.Insitu_time.to_list()),
+            insitu_Data_source = robjects.StrVector(MU_summary_df_of_the_sat_algo.SOURCE.to_list()),
+            site_name = robjects.StrVector(MU_summary_df_of_the_sat_algo.SITE.to_list()),
+            region_name = robjects.StrVector(MU_summary_df_of_the_sat_algo.REGION.to_list()),
+            min_n = robjects.IntVector([MU_criteria["min_n"]]),
+            max_CV = robjects.IntVector([MU_criteria["max_CV"]]),
+            max_hour_diff = robjects.IntVector([MU_criteria["max_hour_diff_between_insitu_and_satellite_measurement"]]),
+            grid_size = robjects.IntVector([MU_criteria["grid_size"]]),
+            date = robjects.StrVector(MU_summary_df_of_the_sat_algo.DATE.to_list()),
+            satellite_source = robjects.StrVector([info.Data_source]),
+            satellite_sensor = robjects.StrVector([info.sensor_name]),
+            satellite_atm_corr = robjects.StrVector([info.atmospheric_correction]),
+            satellite_algorithm = robjects.StrVector([satellite_algorithm]),
+            where_to_save_MU_results = robjects.StrVector([where_are_saved_Match_Up_data])
+            
+        )
 
 # =============================================================================
 #### Classes 
@@ -330,9 +409,9 @@ class MU_database_processing :
 
         MU_data = {'STATIONS' : INSITU_stations,
                    'DATES' : get_insitu_dates_for_each_parameter(INSITU_data),
-                   'INSITU' : INSITU_data.set_index(['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE', 'DATE', 'TIME'])}
+                   'INSITU' : INSITU_data.set_index(list(INSITU_stations.columns) + ['TIME'])}
                    
-        MU_stations = MU_data['STATIONS'].loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE']]
+        MU_stations = MU_data['STATIONS'].loc[:,list(INSITU_stations.columns)[:-1]]
         
         MU_databases = [MU_data]
         filled_base_path = path_to_fill_to_where_to_save_satellite_files(where_are_saved_satellite_data)
@@ -384,21 +463,25 @@ class MU_database_processing :
         
         dump(self.MU_database, self.path_to_the_MU_database , compress=3)
         
+        self.any_modification_has_been_done = True
+        
     def Complete_the_MU_database(self, where_are_saved_satellite_data) : 
         
         paths_already_filled_in_the_database = set( get_non_empty_paths(self.MU_database) )
         MU_databases_to_add = []
         
-        MU_stations = self.MU_database['STATIONS'].loc[:,['SOURCE', 'SITE', 'LATITUDE', 'LONGITUDE']]
+        MU_stations = self.MU_database['STATIONS'].loc[:,list(self.MU_database['STATIONS'].columns)[:-1]]
 
         # Precompute filled paths to avoid redundant calculations
         filled_destination_paths = {
             i: fill_the_sat_paths(
                 info, path_to_fill_to_where_to_save_satellite_files(where_are_saved_satellite_data),
-                local_path=True, dates=self.MU_database['DATES']
+                local_path=True, dates=self.MU_database['DATES'][get_the_corresponding_insitu_parameter_name(info.Satellite_variable)]
             )
             for i, info in self.cases_to_process.iterrows()
         }
+        
+        self.any_modification_has_been_done = False
         
         # pool = multiprocessing.Pool(self.nb_of_cores_to_use)
         with multiprocessing.Pool(self.nb_of_cores_to_use) as pool:
@@ -449,21 +532,34 @@ class MU_database_processing :
                 MU_databases_to_add.append( merged_MU_databases_of_the_case ) 
                         
                 self.MU_database['STATIONS'] = self.MU_database['STATIONS'].drop(['lat_index', 'lon_index'], axis = 1)
+                self.any_modification_has_been_done = True
             
-        MU_databases_to_add = merge_dicts( MU_databases_to_add )
-        self.MU_database = merge_dicts( [MU_databases_to_add, self.MU_database] )
-        
-        dump(self.MU_database, self.path_to_the_MU_database, compress=3)
+        if self.any_modification_has_been_done : 
+            
+            MU_databases_to_add = merge_dicts( MU_databases_to_add )
+            self.MU_database = merge_dicts( [MU_databases_to_add, self.MU_database] )
+            
+            dump(self.MU_database, self.path_to_the_MU_database, compress=3)
         
     # def Perform_matchups
     def Summarize_MU_with_statistics(self) : 
 
+        if self.any_modification_has_been_done == False :          
+
+            self.MU_summary = load( self.path_to_the_MU_database.replace('database', 'summary') )
+            return
+            
         paths_filled_in_the_database = set( [x for x in get_non_empty_paths(self.MU_database) if x.count('/') > 2] )
                 
         with multiprocessing.Pool(self.nb_of_cores_to_use) as pool:
             MU_summaries = pool.starmap(Summarize_the_matchup_database, [(path, 
                                                                           self.MU_database) 
-                                                       for path in paths_filled_in_the_database ])           
+                                                       for path in paths_filled_in_the_database ])  
+            
+        # For debugging
+        # for path in paths_filled_in_the_database  : 
+        #     print(path)
+        #     a = Summarize_the_matchup_database(path, self.MU_database) 
             
         MU_summary = merge_dicts( [x for x in MU_summaries if x is not None ] ) 
         
@@ -481,6 +577,14 @@ class MU_database_processing :
             df = extract_dataframes_iterative(df)       
             df = list(df)
             return pd.concat(df)
+        
+        base_path_to_save_data = self.path_to_the_MU_database.replace('database.joblib', '')
+        
+        if self.any_modification_has_been_done == False :          
+
+            self.MU_database_df = pd.read_csv(f"{base_path_to_save_data}database.csv")
+            self.MU_summary_df = pd.read_csv(f"{base_path_to_save_data}summary.csv")
+            return
 
         MU_summary_df = process_data(self.MU_summary)
         MU_database_df = process_data(self.MU_database).reindex(MU_summary_df.index)
@@ -491,8 +595,25 @@ class MU_database_processing :
         self.MU_summary_df = MU_summary_df
         self.MU_database_df = MU_database_df
     
-        base_path = self.path_to_the_MU_database.replace('database.joblib', '')
-        MU_database_df.to_csv(f"{base_path}database.csv")
-        MU_summary_df.to_csv(f"{base_path}summary.csv")
+        MU_database_df.to_csv(f"{base_path_to_save_data}database.csv")
+        MU_summary_df.to_csv(f"{base_path_to_save_data}summary.csv")
+        
+        
+    def Make_scatterplot_and_save_statistics(self) : 
+        
+        MU_summary_df = self.MU_summary_df.reset_index(drop = False)
+        where_to_save_Match_Up_plots = self.where_to_save_Match_Up_data
+        cases_to_process = self.cases_to_process
+        
+        with multiprocessing.Pool(self.nb_of_cores_to_use) as pool:
+            
+            pool.starmap(scatterplot_and_save_statistics, 
+                         [(MU_summary_df, case_to_process, where_to_save_Match_Up_plots) 
+                          for _, case_to_process in cases_to_process.iterrows() ])
+        
+        # Get all statistics .csv files
+        
+        # Make the final table with them 
+        
         
         
