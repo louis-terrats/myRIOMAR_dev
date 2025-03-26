@@ -282,6 +282,22 @@ def get_all_cases_to_process(core_arguments) :
     
     return cases_to_process
 
+def get_all_cases_to_process_for_regional_maps_or_plumes(core_arguments) : 
+
+    all_possibilities = expand_grid( Zone = core_arguments['Zones'],
+                                    Data_source = core_arguments['Data_sources'], 
+                                    sensor_name = core_arguments['Sensor_names'], 
+                                    atmospheric_correction = core_arguments['Atmospheric_corrections'],
+                                    Year = core_arguments['Years'],
+                                    Satellite_variable = core_arguments['Satellite_variables'],
+                                    Time_resolution = core_arguments['Time_resolution'] if 'Time_resolution' in core_arguments else '')
+    all_possibilities['atmospheric_correction'] = all_possibilities.apply(lambda row: 'Standard' 
+                                                                        if row['Data_source'] == 'SEXTANT' 
+                                                                        else row['atmospheric_correction'], axis=1)
+    all_possibilities = all_possibilities.drop_duplicates()
+    
+    return all_possibilities
+
 
 def create_arborescence(paths):
     arborescence = {}

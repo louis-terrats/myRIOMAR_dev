@@ -15,18 +15,22 @@ from shapely.vectorized import contains
 from skimage import morphology
 from functools import reduce
 
-from utils import (expand_grid, load_file)
+from utils import (load_file)
 
 # =============================================================================
 #### Functions
 # =============================================================================
 
+#### ____ Main
+
 def main_process(file_name, file_names_pattern, 
             parameters, 
             bathymetry_data_aligned_to_reduced_map,
-            is_SEXTANT_file, france_shapefile,
+            france_shapefile,
             map_wo_clouds, land_mask,
-            inside_polygon_mask) : 
+            inside_polygon_mask,
+            where_to_save_plume_results,
+            where_are_saved_regional_maps) : 
 
     """
     Process a single satellite data file for plume detection.
@@ -64,29 +68,15 @@ def main_process(file_name, file_names_pattern,
     # print(file_name)
 
     # Define path to save the figure generated during processing
-    path_to_the_figure_file_to_save = f'{os.path.dirname(file_name).replace("MAPS", "PLUME_DETECTION")}/MAPS/{os.path.basename(file_name)}'.replace('.pkl', '')
+    path_to_the_figure_file_to_save = f'{os.path.dirname(file_name).replace("MAPS", "PLUME_DETECTION").replace(where_are_saved_regional_maps, where_to_save_plume_results)}/MAPS/{os.path.basename(file_name)}'.replace('.pkl', '')
         
     # Ensure the directory for saving figures exists
     os.makedirs(f'{os.path.dirname(path_to_the_figure_file_to_save)}', exist_ok=True)
 
     # Open and load the file (binary file assumed to contain data)
     with open(file_name, 'rb') as f:
-        
-        ds = pickle.load(f)        
-                    
-        if "Basin_map" in ds.keys() :         
+        ds = pickle.load(f)['Basin_map']['map_data']  
 
-            # ds = ds['Basin_map']['map_data'][0] if is_SEXTANT_file else ds['Basin_map']['map_data']
-            ds = ds['Basin_map']['map_data']
-                
-        else : 
-            
-            # ds = ds['map_data'][0] if is_SEXTANT_file else ds['map_data']
-            ds = ds['map_data']
-            
-        if 'date_for_plot' not in ds.coords :
-            ds['date_for_plot'] = ds.day
-            
     # Reduce the resolution of the dataset to the specified latitude and longitude resolutions
     ds_reduced = (reduce_resolution(ds, parameters['lat_new_resolution'], parameters['lon_new_resolution']) 
                   if parameters['lat_new_resolution'] is not None
@@ -96,12 +86,9 @@ def main_process(file_name, file_names_pattern,
     all_mask_area = []
     all_river_mouth_to_remove = []
     thresholds = {key: None for key in parameters['starting_points']}
-    
-    # Check if the area is too cloudy.
-    The_area_is_too_cloudy = Check_if_the_area_is_too_cloudy(ds, map_wo_clouds, parameters)
-    
+        
     # If the percentage of cloud coverage exceeds the specified threshold, return default values without processing the plume area
-    if ( The_area_is_too_cloudy ) : 
+    if ( Check_if_the_area_is_too_cloudy(ds, map_wo_clouds, parameters) ) : 
         
         # Plot the map with no plume area (due to clouds)
         make_the_plot(path_to_the_figure_file_to_save, ds, ds_reduced, france_shapefile, 
@@ -125,19 +112,19 @@ def main_process(file_name, file_names_pattern,
                                            land_mask,
                                            parameters,
                                            plume_name,
-                                           inside_polygon_mask,
-                                           is_SEXTANT_file)
+                                           inside_polygon_mask)
         
         if the_plume is None : 
             continue
         
         thresholds[plume_name] = the_plume.SPM_threshold
         all_mask_area.append(the_plume.plume_mask)
-        all_river_mouth_to_remove.append(the_plume.close_river_mouth_mask)
+        if "close_river_mouth_mask" in vars(the_plume) : 
+            all_river_mouth_to_remove.append(the_plume.close_river_mouth_mask)
         
     
     # If no valid plume area is detected, plot and return default values
-    if (len(all_mask_area) == 0) or (len(all_mask_area) == 1 and all_mask_area[0].any() == False) : 
+    if (len(all_mask_area) == 0) or ( any([x.values.any() for x in all_mask_area]) == False ) : 
         
         make_the_plot(path_to_the_figure_file_to_save, ds, ds_reduced, france_shapefile, 
                       lon_range_of_the_map_to_plot = parameters['lon_range_of_the_map_to_plot'], 
@@ -180,6 +167,7 @@ def main_process(file_name, file_names_pattern,
     
     return data_to_return
 
+#### ____ Utils
 
 def reduce_resolution(ds, lat_bin_size_in_degree, lon_bin_size_in_degree):
         
@@ -1257,7 +1245,7 @@ def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, l
 
     # Compute the SPM threshold as the 10th percentile of filtered values
     # SPM_threshold = np.nanmin( filtered_values )
-    SPM_threshold = np.nanquantile(filtered_values, 0.25) # 0.1
+    SPM_threshold = np.nanquantile(filtered_values, 0.15) # 0.1 # 0.25
     
     return SPM_threshold
 
@@ -1302,22 +1290,6 @@ def find_first_nan_after_finite(arr):
     first_nan_idx = np.where(np.any(nan_after_finite, axis=0), np.argmax(nan_after_finite, axis=0), -1)
     
     return first_nan_idx
-
-def get_all_possibilities_for_plume_detection(Zones, Data_sources, Satellite_sensors, Atmospheric_corrections, Years, Temporal_resolution) : 
-
-    all_possibilities = expand_grid( Zone = Zones,
-                                    Data_source = Data_sources, 
-                                    Satellite_sensor = Satellite_sensors, 
-                                    atmospheric_correction = Atmospheric_corrections,
-                                    Year = Years,
-                                    Time_resolution = Temporal_resolution)
-    
-    all_possibilities['atmospheric_correction'] = all_possibilities.apply(lambda row: 'Standard' 
-                                                                        if row['Data_source'] == 'SEXTANT' 
-                                                                        else row['atmospheric_correction'], axis=1)
-    all_possibilities = all_possibilities.drop_duplicates()
-    
-    return all_possibilities
 
 def pixels_far_from_land(land_mask, pixel_positions, distance_threshold):
     
@@ -1730,7 +1702,7 @@ def define_parameters(Zone) :
         lat_range_to_search_plume_area = [45, 46.5]
         lon_range_to_search_plume_area = [-180, 180]
         maximal_bathymetric_for_zone_with_resuspension = {'Gironde' : 20, 'Charente' : 20, 'Sevre' : 20}
-        minimal_distance_from_estuary_for_zone_with_resuspension = {'Gironde' : 20, 'Charente' : 20, 'Sevre' : 20}
+        minimal_distance_from_estuary_for_zone_with_resuspension = {'Gironde' : 30, 'Charente' : 20, 'Sevre' : 20}
         max_steps_for_the_directions = {'Gironde' : 100, 'Charente' : 50, 'Sevre' : 50}
         lower_high_values_to = 10
         river_mouth_to_exclude = {}
@@ -1739,13 +1711,13 @@ def define_parameters(Zone) :
         
         lon_new_resolution = 0.015
         lat_new_resolution = 0.015
-        searching_strategies = {'Grand Rhone' : {'grid' : np.array([  [False, False, False, False, False],
-                                                                      [False, False, False, False, False],
-                                                                      [False, False, True,  False, False],
-                                                                      [True,  True,  True,  True,  True],
-                                                                      [False, False, False, False, False],
+        searching_strategies = {'Grand Rhone' : {'grid' : np.array([  [False, False, False, False, False, False, False],
+                                                                      [False, False, False, False, False, False, False],
+                                                                      [False, False, False,  True, False, False, False],
+                                                                      [True,  True,  True,  True,  True, True, True],
+                                                                      [False, False, False, False, False, False, False],
                                                                     ]),
-                                      'coordinates_of_center' : (2,2)},
+                                      'coordinates_of_center' : (2,3)},
                                 
                                 'Petit Rhone' : {'grid' : np.array([    [False, False, False, False, False],
                                                                         [False, False, False, False, False],
@@ -1769,7 +1741,7 @@ def define_parameters(Zone) :
         maximal_bathymetric_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
         minimal_distance_from_estuary_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
         max_steps_for_the_directions = {'Grand Rhone' : 35, 'Petit Rhone' : 35}
-        lower_high_values_to = 5
+        lower_high_values_to = 3
         river_mouth_to_exclude = {}
         
     if Zone == 'EASTERN_CHANNEL' :
@@ -1876,6 +1848,8 @@ def define_parameters(Zone) :
         max_steps_for_the_directions = { 'Loire' : None, 'Vilaine' : None}
         river_mouth_to_exclude = {}
     
+    searching_strategy_directions = coordinates_of_pixels_to_inspect( searching_strategies )
+    
     return {'lon_new_resolution' : lon_new_resolution, 
             'lat_new_resolution' : lat_new_resolution, 
             'searching_strategies' : searching_strategies, 
@@ -1893,7 +1867,8 @@ def define_parameters(Zone) :
             'minimal_distance_from_estuary_for_zone_with_resuspension' : minimal_distance_from_estuary_for_zone_with_resuspension,
             'max_steps_for_the_directions' : max_steps_for_the_directions,
             'lower_high_values_to' : lower_high_values_to,
-            'river_mouth_to_exclude' : river_mouth_to_exclude}
+            'river_mouth_to_exclude' : river_mouth_to_exclude,
+            'searching_strategy_directions' : searching_strategy_directions}
         
 
 def remove_coastal_areas_with_sediment_resuspension(ds_reduced, mask_area, land_mask, bathymetry_data_aligned_to_reduced_map,
@@ -2057,7 +2032,7 @@ def find_index_and_values_of_multiple_directions_in_the_plume_area(mask_area, ds
     # plt.show()
     
     # Check if all values are zero, indicating no plume area
-    if (direction_values == 0).all() :                         
+    if (direction_values == 0).all() or (direction_boolean == 0).all() :                         
         
         boolean_values_in_the_area_of_the_plume = []
         values_in_the_area_of_the_plume = []
@@ -2121,8 +2096,8 @@ def return_stats_dictionnary(final_mask_area, spm_reduced_map, spm_map, paramete
         Dictionary containing plume statistics or an empty dictionary with NaN values.
     """
         
-    if return_empty_dict : 
-                
+    def make_an_empty_dict() : 
+        
         # Initialize an empty dictionary with NaN values
         data_to_return = {'date' : np.array(spm_reduced_map.date_for_plot)}
         data_to_return.update({f'{stat_name}': np.nan for stat_name in ['n_pixel_in_the_plume_area', 'area_of_the_plume_mask_in_km2', 
@@ -2131,8 +2106,12 @@ def return_stats_dictionnary(final_mask_area, spm_reduced_map, spm_map, paramete
                                                                         'lon_centroid_of_the_plume_area', 'lat_weighted_centroid_of_the_plume_area',
                                                                         'lon_weighted_centroid_of_the_plume_area', 'confidence_index_in_perc']})
         data_to_return.update({f'SPM_threshold_{plume_name}': np.nan for plume_name, threshold in thresholds.items()})
-
+        
         return data_to_return
+
+    
+    if return_empty_dict : 
+        return make_an_empty_dict()
      
     # Calculate the number of pixels in the plume area
     n_pixel_in_the_plume_area = np.sum(final_mask_area) # Number of pixels in the plume area
@@ -2257,10 +2236,7 @@ def preprocess_annual_dataset_and_compute_land_mask(path_to_annual_ds, parameter
     with open(path_to_annual_ds, 'rb') as f:
             
         multi_annual_ds = pickle.load(f)['Basin_map']['map_data']             
-                    
-    # Computes the relative distances from a center pixel to all "True" values of the searching strategies.
-    parameters['searching_strategy_directions'] = coordinates_of_pixels_to_inspect( parameters['searching_strategies'] )
-                
+                                    
     # Select a subset of the annual dataset based on the area to check for cloud coverage
     multi_annual_ds_subset = multi_annual_ds.sel(lat=slice(parameters['lat_range_of_the_area_to_check_for_clouds'][0], 
                                                            parameters['lat_range_of_the_area_to_check_for_clouds'][1]), 
@@ -2457,15 +2433,14 @@ def fast_delimitation_of_a_river_plume_area(   spm_map, land_mask, start_point, 
                         
     return polygon_path
     
-
+#### ____ Pipeline
 
 def Pipeline_to_delineate_the_plume(ds_reduced, 
                                    bathymetry_data_aligned_to_reduced_map,
                                    land_mask,
                                    parameters,
                                    plume_name,
-                                   inside_polygon_mask,
-                                   is_SEXTANT_file) :
+                                   inside_polygon_mask) :
 
     the_plume = Create_the_plume_mask(ds_reduced, 
                                        bathymetry_data_aligned_to_reduced_map,
@@ -2479,20 +2454,15 @@ def Pipeline_to_delineate_the_plume(ds_reduced,
     the_plume.do_a_raw_plume_detection()
     # the_plume.plume_mask.plot()
     
-    if (is_SEXTANT_file == False) : 
-        the_plume.include_cloudy_regions_to_plume_area()
+    the_plume.include_cloudy_regions_to_plume_area()
     
     the_plume.remove_the_areas_with_sediment_resuspension(maximal_bathymetry = parameters['maximal_bathymetric_for_zone_with_resuspension'][plume_name],
-                                                           minimal_distance_from_estuary = parameters['minimal_distance_from_estuary_for_zone_with_resuspension'][plume_name])
+                                                          minimal_distance_from_estuary = parameters['minimal_distance_from_estuary_for_zone_with_resuspension'][plume_name])
     
     the_plume.remove_shallow_waters()
     
     the_plume.remove_close_river_mouth(the_plume.parameters['pixel_starting_points_close_river_mouth'])
-            
-    # Skip if no valid plume area is detected
-    if the_plume.plume_mask.any() == False : 
-        return None
-    
+                
     the_plume.dilate_the_main_plume_area_to_merge_close_plume_areas()
     
     the_plume.remove_small_shapes_that_do_not_meet_a_minimum_size_criterion()
@@ -2503,9 +2473,9 @@ def Pipeline_to_delineate_the_plume(ds_reduced,
     
     the_plume.remove_shallow_waters()
     
-    the_plume.remove_parts_of_the_plume_area_identified_only_on_the_edge_of_the_searching_area()
+    # the_plume.remove_parts_of_the_plume_area_identified_only_on_the_edge_of_the_searching_area()
     
-    the_plume.remove_parts_of_the_plume_area_with_very_high_SPM_on_the_edge_of_the_searching_zone()
+    # the_plume.remove_parts_of_the_plume_area_with_very_high_SPM_on_the_edge_of_the_searching_zone()
     
     if not np.isin(plume_name, ['Seine']) :
         the_plume.remove_parts_of_the_plume_area_that_widden_after_the_shrinking_phase()
@@ -2647,6 +2617,9 @@ class Create_the_plume_mask :
         Expand the detected plume area to include cloudy regions.
         """
         
+        if self.plume_mask.any() == False : 
+            return None
+        
         self.plume_mask = Set_cloudy_regions_to_True(self.spm_map, self.plume_mask, self.land_mask, self.SPM_threshold) 
         
         self.protocol.append(f'{len(self.protocol)} : include_cloudy_regions_to_plume_area')
@@ -2665,6 +2638,9 @@ class Create_the_plume_mask :
             Minimum distance from the estuary to consider as part of sediment resuspension zones.
             If None, it is retrieved from the parameters dictionary.
         """
+        
+        if self.plume_mask.any() == False : 
+            return None
         
         if maximal_bathymetry is None : 
             maximal_bathymetry = self.parameters['maximal_bathymetric_for_zone_with_resuspension'][self.plume_name]
@@ -2694,6 +2670,9 @@ class Create_the_plume_mask :
             If None, the value is retrieved from the parameters dictionary.
         """
         
+        if self.plume_mask.any() == False : 
+            return None
+        
         if bathymetric_threshold is None :
             bathymetric_threshold = self.parameters['bathymetric_threshold']
         
@@ -2707,6 +2686,9 @@ class Create_the_plume_mask :
         Dilate the plume mask to merge closely located plume areas.
         """    
     
+        if self.plume_mask.any() == False : 
+            return None
+        
         self.plume_mask = merge_plume_shape_with_close_shapes(self.plume_mask, 
                                                         self.parameters['core_of_the_plumes'][self.plume_name],
                                                         self.land_mask,
@@ -2731,6 +2713,9 @@ class Create_the_plume_mask :
             Default is 3.
         """
         
+        if self.plume_mask.any() == False : 
+            return None
+        
         self.plume_mask.values = morphology.remove_small_objects(self.plume_mask.values, minimum_size_threshold)     
         self.protocol.append(f'{len(self.protocol)} : Remove_small_shapes_that_do_not_meet_a_minimum_size_criterion')
         
@@ -2745,6 +2730,9 @@ class Create_the_plume_mask :
             Boolean mask indicating the valid searching area (True = valid).
         """    
     
+        if self.plume_mask.any() == False : 
+            return None
+        
         self.plume_mask = self.plume_mask.where(searching_area, other=False)
         self.protocol.append(f'{len(self.protocol)} : Set_pixels_to_False_if_outside_of_the_searching_area')
         
@@ -2760,6 +2748,9 @@ class Create_the_plume_mask :
             from the parameters dictionary.
         """
         
+        if self.plume_mask.any() == False : 
+            return None
+        
         if plume_core_location is None : 
             plume_core_location = self.parameters['core_of_the_plumes'][self.plume_name]
         
@@ -2773,6 +2764,9 @@ class Create_the_plume_mask :
         Remove parts of the plume area that are identified only on the edge of the searching area.
         """
         
+        if self.plume_mask.any() == False : 
+            return None
+        
         boolean_values_in_the_area_of_the_plume, \
             values_in_the_area_of_the_plume, \
             direction_points = find_index_and_values_of_multiple_directions_in_the_plume_area(mask_area = self.plume_mask, 
@@ -2780,6 +2774,9 @@ class Create_the_plume_mask :
                                                                                               pixel_starting_point = self.parameters['pixel_starting_points'][self.plume_name], 
                                                                                               searching_strategy_direction = self.parameters['searching_strategy_directions'][self.plume_name],
                                                                                               max_steps = self.parameters['max_steps_for_the_directions'][self.plume_name])
+        
+        if len(boolean_values_in_the_area_of_the_plume) == 0 : 
+            return None
         
         edge_idd = int( round( boolean_values_in_the_area_of_the_plume.shape[0] / 3 ) / 2 )
         non_zero_in_middle = np.any( boolean_values_in_the_area_of_the_plume[edge_idd:-edge_idd, :] != 0, axis=0)
@@ -2791,6 +2788,9 @@ class Create_the_plume_mask :
         boolean_values_in_the_area_of_the_plume[ [0,1,-1,-2], (refine_removal_of_edge_effect[1] + 1):] = 0
        
         index_to_keep = np.where(boolean_values_in_the_area_of_the_plume == 1)
+        
+        if len(index_to_keep[0]) == 0 :
+            return None
 
         self.plume_mask = set_mask_area_values_to_False_based_on_an_index_object(self.plume_mask, 
                                                                            index_object = index_to_keep, 
@@ -2804,6 +2804,9 @@ class Create_the_plume_mask :
         Remove parts of the plume area with very high SPM values near the edge of the searching zone.
         """    
     
+        if self.plume_mask.any() == False : 
+            return None
+    
         boolean_values_in_the_area_of_the_plume, \
             values_in_the_area_of_the_plume, \
             direction_points = find_index_and_values_of_multiple_directions_in_the_plume_area(self.plume_mask, 
@@ -2812,6 +2815,9 @@ class Create_the_plume_mask :
                                                                                                 self.parameters['searching_strategy_directions'][self.plume_name],
                                                                                                 self.parameters['max_steps_for_the_directions'][self.plume_name])
     
+        if len(boolean_values_in_the_area_of_the_plume) == 0 : 
+            return None
+        
         SPM_threshold_on_the_edge = self.SPM_threshold * 1.5
         test_values = np.array([ (values_in_the_area_of_the_plume[0][i] > SPM_threshold_on_the_edge) or 
                                 (values_in_the_area_of_the_plume[-1][i] > SPM_threshold_on_the_edge) for  
@@ -2853,6 +2859,9 @@ class Create_the_plume_mask :
         Remove parts of the plume area that widen after the shrinking phase.
         """
         
+        if self.plume_mask.any() == False : 
+            return None
+        
         boolean_values_in_the_area_of_the_plume, \
             values_in_the_area_of_the_plume, \
             direction_points = find_index_and_values_of_multiple_directions_in_the_plume_area(self.plume_mask, 
@@ -2861,6 +2870,8 @@ class Create_the_plume_mask :
                                                                                                 self.parameters['searching_strategy_directions'][self.plume_name],
                                                                                                 self.parameters['max_steps_for_the_directions'][self.plume_name])
         
+        if len(boolean_values_in_the_area_of_the_plume) == 0 : 
+            return None
         
         row_sums = np.sum(boolean_values_in_the_area_of_the_plume == 1, axis=0)
         increase_indices = np.where(np.diff(row_sums) >= 1)[0] + 1
@@ -2903,6 +2914,9 @@ class Create_the_plume_mask :
         - The plume boundaries are determined using a convex hull polygon.
         """
            
+        if self.plume_mask.any() == False : 
+            return None
+        
         self.close_river_mouth_mask = xr.zeros_like(self.plume_mask)
         
         # Loop through each provided river mouth position

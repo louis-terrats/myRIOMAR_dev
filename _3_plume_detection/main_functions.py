@@ -1,23 +1,21 @@
 import os, pickle, glob, multiprocessing, imageio, re
-
-import numpy as np
-import geopandas as gpd
 import pandas as pd
-import matplotlib as mpl
-# import rpy2.robjects as robjects
+import rpy2.robjects as robjects
 
 
-from utils import (exit_program, expand_grid, align_bathymetry_to_resolution, 
-                            unique_years_between_two_dates, store_arguments, load_shapefile_data,
+from utils import (align_bathymetry_to_resolution, 
+                            unique_years_between_two_dates, load_shapefile_data,
                             path_to_fill_to_where_to_save_satellite_files,
-                            fill_the_sat_paths)
+                            fill_the_sat_paths, get_all_cases_to_process_for_regional_maps_or_plumes)
 
 from _3_plume_detection.utils import (main_process, define_parameters, reduce_resolution, 
-                                            create_polygon_mask, preprocess_annual_dataset_and_compute_land_mask,
-                                            get_all_possibilities_for_plume_detection)
+                                      create_polygon_mask, preprocess_annual_dataset_and_compute_land_mask)
+
+import _3_plume_detection.utils
 
 
-def apply_plume_mask(arguments) :
+def apply_plume_mask(core_arguments, Zones, detect_plumes_on_which_temporal_resolution_data,
+                    nb_of_cores_to_use, where_are_saved_regional_maps, where_to_save_plume_results) :
     
     """
     Apply a plume mask to satellite data.
@@ -50,46 +48,29 @@ def apply_plume_mask(arguments) :
         The results are saved as files in the specified `working_directory`.
     """
     
-    (Data_sources, 
-     Sensor_names, 
-     Satellite_variables, 
-     Atmospheric_corrections,
-     Temporal_resolution, 
-     start_day, end_day, 
-     working_directory, 
-     where_to_save_satellite_data, 
-     overwrite_existing_satellite_files,
-     redo_the_MU_database,
-     path_to_SOMLIT_insitu_data,
-     path_to_REPHY_insitu_data,
-     Zones,
-     overwrite_existing_regional_maps,
-     plot_the_daily_regional_maps,
-     nb_of_cores_to_use) = store_arguments(arguments, return_arguments = True)
+    core_arguments.update({'Years' : unique_years_between_two_dates(core_arguments['start_day'], core_arguments['end_day']),
+                           'Zones' : Zones,
+                           'Satellite_variables': ['SPM'],
+                           'Time_resolution' : ([detect_plumes_on_which_temporal_resolution_data] 
+                                                    if isinstance(detect_plumes_on_which_temporal_resolution_data, str) 
+                                                    else detect_plumes_on_which_temporal_resolution_data)})
     
-    Years = unique_years_between_two_dates(start_day, end_day)
-    
-    france_shapefile = load_shapefile_data()
-    
-    cases_to_process = get_all_possibilities_for_plume_detection(Zones, Data_sources, Sensor_names, 
-                                                                 Atmospheric_corrections, Years, Temporal_resolution)
-    
-    for i in range(cases_to_process.shape[0]) : 
-                
-        info = cases_to_process.iloc[i].copy()
-        info['Satellite_variable'] = 'SPM'
+    cases_to_process = get_all_cases_to_process_for_regional_maps_or_plumes(core_arguments)
         
-        print(f'{i} over {cases_to_process.shape[0]-1} ({info.Zone} / {info.Data_source} / {info.Satellite_sensor} / {info.atmospheric_correction} / {info.Year} / {info.Time_resolution})')
-
-        # Check if the data source is from SEXTANT or similar databases.
-        is_SEXTANT_file = np.isin(info.Data_source, ['SEXTANT', 'SAMUEL'])
+    france_shapefile = load_shapefile_data()
+        
+    for i, info in cases_to_process.iterrows() : 
+            
+        # info = cases_to_process.iloc[i]
+        
+        print(f'{i} over {cases_to_process.shape[0]-1} ({info.Zone} / {info.Data_source} / {info.sensor_name} / {info.atmospheric_correction} / {info.Year} / {info.Time_resolution})')
             
         # Retrieve specific parameters based on the selected zone.
         parameters = define_parameters(info.Zone)
                     
         # Build the file pattern to locate the satellite data files.       
         file_names_pattern = fill_the_sat_paths(info, 
-                                               path_to_fill_to_where_to_save_satellite_files(working_directory + 'RESULTS/' + info.Zone).replace('[TIME_FREQUENCY]', ''),
+                                               path_to_fill_to_where_to_save_satellite_files(where_are_saved_regional_maps + "/" + info.Zone).replace('[TIME_FREQUENCY]', ''),
                                                local_path = True).replace('/*/*/*', f'MAPS/{info.Time_resolution}/{info.Year}/*.pkl')
                 
         # Check if the directory for the year's data exists; if not, skip processing.
@@ -111,7 +92,7 @@ def apply_plume_mask(arguments) :
                           else ds )
                 
         # Align bathymetry data to the dataset resolution.
-        bathymetry_data_aligned_to_reduced_map = align_bathymetry_to_resolution(ds_reduced, f'{working_directory}/RESULTS/{info.Zone}/Bathy_data.pkl')
+        bathymetry_data_aligned_to_reduced_map = align_bathymetry_to_resolution(ds_reduced, f'{where_are_saved_regional_maps}/{info.Zone}/Bathy_data.pkl')
             
         # Create a mask that delineate the searching area.
         inside_polygon_mask = create_polygon_mask(ds_reduced, parameters)
@@ -125,16 +106,17 @@ def apply_plume_mask(arguments) :
         # Process each file in parallel
         with multiprocessing.Pool(nb_of_cores_to_use) as pool:
 
-            results = pool.starmap(main_process, 
+            results = pool.starmap(_3_plume_detection.utils.main_process, 
                         [(    file_name, 
                               file_names_pattern, 
                               parameters,
                               bathymetry_data_aligned_to_reduced_map,
-                              is_SEXTANT_file,
                               france_shapefile, 
                               map_wo_clouds,
                               land_mask,
-                              inside_polygon_mask) for file_name in file_names ])
+                              inside_polygon_mask,
+                              where_to_save_plume_results,
+                              where_are_saved_regional_maps) for file_name in file_names ])
         
         # Create a DataFrame from the results, sort by date, and save it to a CSV
         statistics = pd.DataFrame([x for x in results if x is not None]).sort_values('date').reset_index(drop = True)
@@ -154,7 +136,6 @@ def apply_plume_mask(arguments) :
         #           file_names_pattern, 
         #           parameters,
         #           bathymetry_data_aligned_to_reduced_map,
-        #           is_SEXTANT_file,
         #           france_shapefile, 
         #           map_wo_clouds,
         #           land_mask,
@@ -175,7 +156,7 @@ def apply_plume_mask(arguments) :
     #                                     Years = np.arange(1998,2025))
     
     
-def plot_time_series_of_plume_areas(working_directory, Zones, Data_sources, Satellite_sensors, Atmospheric_corrections, Time_resolutions, Years):
+def plot_time_series_of_plume_areas(core_arguments, Zones, on_which_temporal_resolution_the_plumes_have_been_detected, where_are_saved_plume_results):
     
     """
     Calls the R function `plot_time_series_of_plume_area_and_thresholds` from Python.
@@ -190,18 +171,25 @@ def plot_time_series_of_plume_areas(working_directory, Zones, Data_sources, Sate
         Years (list): List of years.
     """
     
+    core_arguments.update({'Years' : unique_years_between_two_dates(core_arguments['start_day'], core_arguments['end_day']),
+                           'Zones' : Zones,
+                           'Satellite_variables': ['SPM'],
+                           'Time_resolution' : ([on_which_temporal_resolution_the_plumes_have_been_detected] 
+                                                    if isinstance(on_which_temporal_resolution_the_plumes_have_been_detected, str) 
+                                                    else on_which_temporal_resolution_the_plumes_have_been_detected)})
+    
     # Source the R script
-    robjects.r['source']("myRIOMAR/plume_detection/utils.R")
+    robjects.r['source']("myRIOMAR_dev/_3_plume_detection/utils.R")
 
     r_function = robjects.r['plot_time_series_of_plume_area_and_thresholds']
 
     # Call the R function
     r_function(
-        working_directory = robjects.StrVector([working_directory]),
-        Zone = robjects.StrVector(Zones),
-        Data_source = robjects.StrVector(Data_sources),
-        Satellite_sensor = robjects.StrVector(Satellite_sensors),
-        atmospheric_correction = robjects.StrVector(Atmospheric_corrections),
-        Time_resolution = robjects.StrVector(Time_resolutions),
-        Years = robjects.IntVector(list(Years))
+        where_are_saved_plume_results = robjects.StrVector([where_are_saved_plume_results]),
+        Zone = robjects.StrVector(core_arguments['Zones']),
+        Data_source = robjects.StrVector(core_arguments['Data_sources']),
+        Satellite_sensor = robjects.StrVector(core_arguments['Sensor_names']),
+        atmospheric_correction = robjects.StrVector(core_arguments['Atmospheric_corrections']),
+        Time_resolution = robjects.StrVector(core_arguments['Time_resolution']),
+        Years = robjects.IntVector(core_arguments['Years'])
     )

@@ -1,9 +1,9 @@
 import multiprocessing
 import pandas as pd
 
-from _2_regional_maps.utils import Create_and_save_the_maps, QC_maps, get_all_possibilities
+from _2_regional_maps.utils import Create_and_save_the_maps, QC_maps
 
-from utils import (store_arguments, unique_years_between_two_dates)
+from utils import (store_arguments, unique_years_between_two_dates, get_all_cases_to_process_for_regional_maps_or_plumes)
 
 
 def create_regional_maps(core_arguments, Zones, overwrite_existing_regional_maps, save_map_plots_of_which_time_frequency, nb_of_cores_to_use,
@@ -12,7 +12,7 @@ def create_regional_maps(core_arguments, Zones, overwrite_existing_regional_maps
     core_arguments.update({'Years' : unique_years_between_two_dates(core_arguments['start_day'], core_arguments['end_day']),
                            'Zones' : Zones})
     
-    cases_to_process = get_all_possibilities(core_arguments)
+    cases_to_process = get_all_cases_to_process_for_regional_maps_or_plumes(core_arguments)
     
     for i, info in cases_to_process.iterrows() : 
                 
@@ -26,7 +26,7 @@ def create_regional_maps(core_arguments, Zones, overwrite_existing_regional_maps
         maps_creation = Create_and_save_the_maps(where_to_save_regional_maps, where_are_saved_satellite_data, info) 
         
         if ('map_files' not in vars(maps_creation)) or len(maps_creation.map_files) == 0 : 
-            print(f"No satellite file here : {where_are_saved_satellite_data}/{info.Data_source}/' - Switch to the next iterate")
+            print(f"Switch to the next iterate")
             continue
         
         if maps_creation.are_the_maps_already_produced and (overwrite_existing_regional_maps == False) : 

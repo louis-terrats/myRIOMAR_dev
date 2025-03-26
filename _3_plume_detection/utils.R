@@ -47,7 +47,7 @@ plot_function <- function(data, y_variable) {
   data %>% 
     ggplot(aes(x = date, y = .data[[y_variable]], group = Satellite_sensor, color = Satellite_sensor)) +
     geom_line(linewidth = 1.5, na.rm = TRUE) + geom_point(size = 2, na.rm = TRUE) + 
-    labs(y = case_when(grepl("^SPM_threshold", y_variable) ~ y_variable %>% str_replace_all("_", " "),
+    labs(y = case_when(grepl("^SPM_threshold", y_variable) ~ y_variable %>% str_replace_all("_", " ") %>% str_replace_all("threshold ", "threshold\n"),
                        y_variable == "area_of_the_plume_mask_in_km2" ~ "Plume area (km²)")) + 
     ggplot_theme() 
   
@@ -61,23 +61,23 @@ make_the_plot_from_the_df <- function(data) {
                                 ncol = 1, align = 'v', common.legend = TRUE)
   
   unique(data$path_to_file) %>% 
-    l_ply( save_plot_as_png, name = paste('Time_series_of', tolower(data$Var10[1]), 'plume_area_and_SPM_threshold', sep = "_"), 
-                                          width = 28, height = 16, plot = time_series_plot )
+    l_ply( save_plot_as_png, name = paste('Time_series_of', tolower(data$Var8[1]), 'plume_area_and_SPM_threshold', sep = "_"), 
+                                          width = 28, height = 22, plot = time_series_plot )
   
 }
 
-# work_dir = '/home/terrats/Desktop/RIOMAR/'
-# Zone = 'BAY_OF_SEINE'
+# where_are_saved_plume_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS'
+# Zone = 'BAY_OF_BISCAY'
 # Data_source = 'SEXTANT'
 # Satellite_sensor = c('merged', 'modis')
 # atmospheric_correction = 'Standard'
-# Time_resolution = 'DAILY'
-# Years = 2018:2021
+# Time_resolution = 'WEEKLY'
+# Years = 2020
 
-plot_time_series_of_plume_area_and_thresholds <- function(work_dir, Zone, Data_source, Satellite_sensor, atmospheric_correction, Time_resolution, Years) {
+plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_results, Zone, Data_source, Satellite_sensor, atmospheric_correction, Time_resolution, Years) {
   
-  cases_to_process <- expand.grid(work_dir, 'RESULTS', Zone, Data_source, "Satellite_sensor", atmospheric_correction, 
-                                  Years %>% as.character(), 'PLUME_DETECTION', 'SPM-G', Time_resolution)
+  cases_to_process <- expand.grid(where_are_saved_plume_results, Zone, Data_source, "SPM", "Satellite_sensor", 
+                                  atmospheric_correction, 'PLUME_DETECTION', Time_resolution, Years %>% as.character())
   
   ts_data <- cases_to_process %>% 
         adply(1, function(row) {
@@ -107,8 +107,10 @@ plot_time_series_of_plume_area_and_thresholds <- function(work_dir, Zone, Data_s
             
         })
   
-  global_cases_to_process <- expand.grid(work_dir, 'RESULTS', Zone, Data_source, "*", atmospheric_correction, 
-                                         "*", 'PLUME_DETECTION', 'SPM-G', Time_resolution)
+  if (ts_data %>% nrow() == 0) {print("No file found"); return()}
+  
+  global_cases_to_process <- expand.grid(where_are_saved_plume_results, Zone, Data_source, "SPM", "*", 
+                                         "*", 'PLUME_DETECTION', Time_resolution)
   
   global_cases_to_process %>% 
     
@@ -117,12 +119,12 @@ plot_time_series_of_plume_area_and_thresholds <- function(work_dir, Zone, Data_s
       file_path <- row %>% as_vector() %>% paste(collapse = "/")
       
       ts_data_of_the_case <- ts_data %>% 
-                              filter(Var3 == row$Var3, Var4 == row$Var4, Var6 == row$Var6, Var10 == row$Var10) %>% 
+                              filter(Var3 == row$Var3, Var8 == row$Var8) %>% 
                               mutate(path_to_file = file_path %>% str_remove_all('[*][A-Za-z0-9/_-]*'))
       
       save_file_as_csv(ts_data_of_the_case, 
                        file.path(ts_data_of_the_case$path_to_file[1], paste('Time_series_of', 
-                                                                         tolower(ts_data_of_the_case$Var10[1]), 
+                                                                         tolower(ts_data_of_the_case$Var8[1]), 
                                                                          'plume_area_and_SPM_threshold', sep = "_")))
 
       make_the_plot_from_the_df(data = ts_data_of_the_case)                   

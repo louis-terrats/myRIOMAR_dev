@@ -84,8 +84,8 @@ def download_files_from_ftp(self):
         # print( f'{i} over {len(remote_folders)-1}' )
         
         if downloaded_files > 0 and downloaded_files % 30 == 0 : # Pause the execution for 30'' every 20 files downloaded.
-            print('15-second run stop')
-            time.sleep(15) 
+            print('30-second run stop')
+            time.sleep(30) 
         
         os.makedirs(local_folder, exist_ok=True)  # Ensure local directory exists
     

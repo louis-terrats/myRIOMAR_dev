@@ -344,21 +344,6 @@ def extract_key_data(map_ini, info,
                                               np.max(map_values_of_the_zone.lat), 
                                               np.min(map_values_of_the_zone.lon), 
                                               np.max(map_values_of_the_zone.lon)]]}
-
-def get_all_possibilities(core_arguments) : 
-
-    all_possibilities = expand_grid( Zone = core_arguments['Zones'],
-                                    Data_source = core_arguments['Data_sources'], 
-                                    sensor_name = core_arguments['Sensor_names'], 
-                                    atmospheric_correction = core_arguments['Atmospheric_corrections'],
-                                    Year = core_arguments['Years'],
-                                    Satellite_variable = core_arguments['Satellite_variables'])
-    all_possibilities['atmospheric_correction'] = all_possibilities.apply(lambda row: 'Standard' 
-                                                                        if row['Data_source'] == 'SEXTANT' 
-                                                                        else row['atmospheric_correction'], axis=1)
-    all_possibilities = all_possibilities.drop_duplicates()
-    
-    return all_possibilities
         
 def get_file_patterns(pattern, suffix_ranges):
     
@@ -1142,7 +1127,7 @@ class Create_and_save_the_maps :
             
         # Check if satellite files are available
         if not map_files : 
-            print("Error on searching the satellite data files - No satellite file")
+            print("No satellite file found")
             return
         
         # Extract days from filenames and generate all days of the year

@@ -272,6 +272,9 @@ def get_the_corresponding_insitu_parameter_name(satellite_variable_name) :
     if 'CHL' in satellite_variable_name : 
         return 'CHLA'
     
+    if 'RRS' in satellite_variable_name : 
+        return 'CHLA'
+    
     if 'SST' in satellite_variable_name : 
         return 'TEMP'
 
