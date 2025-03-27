@@ -95,7 +95,10 @@ def temporal_decomp_V2_7_x11(values, dates, time_frequency,
     
     # missing_values_are = np.nan # -99999
     # fbad = np.nan
-        
+    
+    if isinstance(dates, str) : 
+        dates = pd.to_datetime(dates)
+    
     var = pd.Series(values, index= dates )
 
     if time_frequency == "ANNUAL" : 

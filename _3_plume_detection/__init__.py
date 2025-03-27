@@ -1,1 +1,1 @@
-from _3_plume_detection.main_functions import apply_plume_mask, plot_time_series_of_plume_areas
+from _3_plume_detection.main_functions import apply_plume_mask, make_and_plot_time_series_of_plume_areas

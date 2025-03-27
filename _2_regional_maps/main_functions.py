@@ -1,9 +1,8 @@
-import multiprocessing
 import pandas as pd
 
 from _2_regional_maps.utils import Create_and_save_the_maps, QC_maps
 
-from utils import (store_arguments, unique_years_between_two_dates, get_all_cases_to_process_for_regional_maps_or_plumes)
+from utils import (unique_years_between_two_dates, get_all_cases_to_process_for_regional_maps_or_plumes_or_X11)
 
 
 def create_regional_maps(core_arguments, Zones, overwrite_existing_regional_maps, save_map_plots_of_which_time_frequency, nb_of_cores_to_use,
@@ -12,7 +11,7 @@ def create_regional_maps(core_arguments, Zones, overwrite_existing_regional_maps
     core_arguments.update({'Years' : unique_years_between_two_dates(core_arguments['start_day'], core_arguments['end_day']),
                            'Zones' : Zones})
     
-    cases_to_process = get_all_cases_to_process_for_regional_maps_or_plumes(core_arguments)
+    cases_to_process = get_all_cases_to_process_for_regional_maps_or_plumes_or_X11(core_arguments)
     
     for i, info in cases_to_process.iterrows() : 
                 

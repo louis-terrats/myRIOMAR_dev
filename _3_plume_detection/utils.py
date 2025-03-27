@@ -1246,6 +1246,8 @@ def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, l
     # Compute the SPM threshold as the 10th percentile of filtered values
     # SPM_threshold = np.nanmin( filtered_values )
     SPM_threshold = np.nanquantile(filtered_values, 0.15) # 0.1 # 0.25
+    if SPM_threshold < 0.5 : 
+        SPM_threshold = 0.5
     
     return SPM_threshold
 
@@ -2449,7 +2451,7 @@ def Pipeline_to_delineate_the_plume(ds_reduced,
                                        plume_name)
             
     the_plume.determine_SPM_threshold()
-    # the_plume.SPM_threshold
+    # the_plume.SPM_threshold = 0.75
     
     the_plume.do_a_raw_plume_detection()
     # the_plume.plume_mask.plot()

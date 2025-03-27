@@ -6,11 +6,12 @@ Created on Wed Jan  8 12:31:44 2025
 @author: terrats
 """
 
-import sys, pickle, os, bathyreq, glob, datetime, pygadm, importlib.resources
+import sys, pickle, os, bathyreq, glob, datetime, importlib.resources, tempfile, shutil
 from itertools import product, chain
 import pandas as pd
 import xarray as xr
 import numpy as np
+import geopandas as gpd
 import re
 from functools import reduce
 from collections.abc import Mapping, Iterable
@@ -212,9 +213,9 @@ def fill_the_sat_paths(info, path_to_fill, local_path = False, dates = []) :
                         .replace('[ATMOSPHERIC_CORRECTION]', info.atmospheric_correction)
                         .replace('[SENSOR]', info.sensor_name if 'sensor_name' in info else info.Satellite_sensor) )
                       
-    if 'Temporal_resolution' in info.keys() : 
+    if 'Temporal_resolution' in info.keys() or 'Temporal_resolution' in info.keys() : 
         
-        Temporal_resolution = info.Temporal_resolution
+        Temporal_resolution = info.Temporal_resolution if 'Temporal_resolution' in info.keys() else info.Temporal_resolution
         if local_path == False : 
             Temporal_resolution = (Temporal_resolution
                                     .replace('DAILY', 'day')
@@ -282,7 +283,7 @@ def get_all_cases_to_process(core_arguments) :
     
     return cases_to_process
 
-def get_all_cases_to_process_for_regional_maps_or_plumes(core_arguments) : 
+def get_all_cases_to_process_for_regional_maps_or_plumes_or_X11(core_arguments) : 
 
     all_possibilities = expand_grid( Zone = core_arguments['Zones'],
                                     Data_source = core_arguments['Data_sources'], 
@@ -290,14 +291,15 @@ def get_all_cases_to_process_for_regional_maps_or_plumes(core_arguments) :
                                     atmospheric_correction = core_arguments['Atmospheric_corrections'],
                                     Year = core_arguments['Years'],
                                     Satellite_variable = core_arguments['Satellite_variables'],
-                                    Time_resolution = core_arguments['Time_resolution'] if 'Time_resolution' in core_arguments else '')
+                                    Temporal_resolution = (core_arguments['Temporal_resolution'] if 'Temporal_resolution' in core_arguments 
+                                                       else core_arguments['Temporal_resolution'] if 'Temporal_resolution' in core_arguments 
+                                                       else '') )
     all_possibilities['atmospheric_correction'] = all_possibilities.apply(lambda row: 'Standard' 
                                                                         if row['Data_source'] == 'SEXTANT' 
                                                                         else row['atmospheric_correction'], axis=1)
     all_possibilities = all_possibilities.drop_duplicates()
     
     return all_possibilities
-
 
 def create_arborescence(paths):
     arborescence = {}
@@ -471,19 +473,23 @@ def unique_years_between_two_dates(start_date: str, end_date: str):
 
 def load_shapefile_data() : 
     
-    try : 
-        france_shapefile = pygadm.Items(name="FRANCE", content_level=0)
-        return france_shapefile
-    except Exception as e :
-        print(f"The France shapefile can't be accessed through pygadm : {e}")
-        print("The France shapefiles can be manually downloaded for free : e.g. https://gadm.org/download_country.html ")
+    france_shapefile = load_csv_files_in_the_package_folder(FRANCE_shapefile = True)
+    
+    return france_shapefile 
+            
+    # try : 
+    #     france_shapefile = pygadm.Items(name="FRANCE", content_level=0)
+    #     return france_shapefile
+    # except Exception as e :
+    #     print(f"The France shapefile can't be accessed through pygadm : {e}")
+    #     print("The France shapefiles can be manually downloaded for free : e.g. https://gadm.org/download_country.html ")
  
     
 def extract_and_format_date_from_path(path):
     match = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', path)
     return ''.join(match.groups()) if match else None   
 
-def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False):
+def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False, FRANCE_shapefile = False):
     
     if SOMLIT : 
         with importlib.resources.open_text('myRIOMAR_dev._1_data_validation.INSITU_data.SOMLIT', 'Somlit.csv') as f:
@@ -495,5 +501,21 @@ def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False):
     if REPHY : 
         with importlib.resources.open_binary('myRIOMAR_dev._1_data_validation.INSITU_data.REPHY', 'Table1_REPHY_hydro_RIOMAR.csv.gz') as f:
             return pd.read_csv(f, sep = ";", header = 0, encoding="ISO-8859-1", compression = {'method' : 'gzip'})
+        
+    if FRANCE_shapefile : 
+        
+        shp_folder = importlib.resources.files('myRIOMAR_dev._3_plume_detection.FRANCE_shapefile')  # Directly get the package folder path
+    
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Extract all necessary shapefile components
+            for ext in ['.shp', '.shx', '.dbf', '.prj', '.cpg']:
+                shp_file = shp_folder / f'gadm41_FRA_0{ext}'
+                if shp_file.exists():  # Ensure the file exists before copying
+                    shutil.copy(shp_file, os.path.join(tmp_dir, f'gadm41_FRA_0{ext}'))
+    
+            # Read the shapefile from the temporary directory
+            shapefile_path = os.path.join(tmp_dir, 'gadm41_FRA_0.shp')
+            return gpd.read_file(shapefile_path)
+
     
     

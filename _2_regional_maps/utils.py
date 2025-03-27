@@ -15,7 +15,6 @@ from utils import (load_file, align_bathymetry_to_resolution, degrees_to_km, fin
                             path_to_fill_to_where_to_save_satellite_files, fill_the_sat_paths,
                             extract_and_format_date_from_path)
 
-
 # =============================================================================
 #### Functions
 # =============================================================================

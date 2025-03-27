@@ -1,4 +1,4 @@
-list_of_packages <- c("tidyverse", "plyr", "ggpubr", "viridis")
+list_of_packages <- c("tidyverse", "plyr", "ggpubr", "viridis", "doParallel")
 new.packages <- list_of_packages[!(list_of_packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 lapply(list_of_packages, require, character.only = TRUE)
@@ -44,8 +44,14 @@ save_file_as_csv <- function(data, file_name) {
 
 plot_function <- function(data, y_variable) {
   
-  data %>% 
-    ggplot(aes(x = date, y = .data[[y_variable]], group = Satellite_sensor, color = Satellite_sensor)) +
+  if ("Satellite_sensor" %in% names(data)) {
+    ggplot_base <- ggplot(data, aes(x = date, y = .data[[y_variable]], group = Satellite_sensor, color = Satellite_sensor))  
+  } else {
+    ggplot_base <- ggplot(data, aes(x = date, y = .data[[y_variable]], group = row$Satellite_sensor, color = row$Satellite_sensor)) + 
+      labs(color = "")
+  }
+  
+  ggplot_base +
     geom_line(linewidth = 1.5, na.rm = TRUE) + geom_point(size = 2, na.rm = TRUE) + 
     labs(y = case_when(grepl("^SPM_threshold", y_variable) ~ y_variable %>% str_replace_all("_", " ") %>% str_replace_all("threshold ", "threshold\n"),
                        y_variable == "area_of_the_plume_mask_in_km2" ~ "Plume area (km²)")) + 
@@ -53,82 +59,112 @@ plot_function <- function(data, y_variable) {
   
 }
 
-make_the_plot_from_the_df <- function(data) {
+make_the_plot_from_the_df <- function(data, row, where_to_save_the_file, plot_name) {
   
   SPM_thresholds_columns <- data %>% names() %>% grep(pattern = "^SPM_threshold", value = TRUE)
   
   time_series_plot <- ggarrange(plotlist = c("area_of_the_plume_mask_in_km2", SPM_thresholds_columns) %>% llply(plot_function, data = data),
                                 ncol = 1, align = 'v', common.legend = TRUE)
   
-  unique(data$path_to_file) %>% 
-    l_ply( save_plot_as_png, name = paste('Time_series_of', tolower(data$Var8[1]), 'plume_area_and_SPM_threshold', sep = "_"), 
-                                          width = 28, height = 22, plot = time_series_plot )
+  where_to_save_the_file %>% 
+    l_ply( save_plot_as_png, name = plot_name, width = 28, height = 22, plot = time_series_plot )
   
 }
 
-# where_are_saved_plume_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS'
-# Zone = 'BAY_OF_BISCAY'
-# Data_source = 'SEXTANT'
-# Satellite_sensor = c('merged', 'modis')
-# atmospheric_correction = 'Standard'
-# Time_resolution = 'WEEKLY'
-# Years = 2020
+where_are_saved_plume_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS'
+where_to_save_plume_time_series = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS'
+Zone = c('GULF_OF_LION', 'BAY_OF_SEINE')
+Data_source = 'SEXTANT'
+Satellite_sensor = c('merged', 'modis')
+atmospheric_correction = 'Standard'
+Time_resolution = 'WEEKLY'
+Years = 2019
+Plumes = list('GULF_OF_LION' = list('Grand Rhone', 'Petit Rhone'), 'BAY_OF_SEINE' = list('Seine'))
+nb_of_cores_to_use = 6
 
-plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_results, Zone, Data_source, Satellite_sensor, atmospheric_correction, Time_resolution, Years) {
+plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_results, where_to_save_plume_time_series, 
+                                                          Zone, Data_source, Satellite_sensor, 
+                                                          atmospheric_correction, Time_resolution, Years, Plumes, nb_of_cores_to_use) {
   
-  cases_to_process <- expand.grid(where_are_saved_plume_results, Zone, Data_source, "SPM", "Satellite_sensor", 
-                                  atmospheric_correction, 'PLUME_DETECTION', Time_resolution, Years %>% as.character())
-  
-  ts_data <- cases_to_process %>% 
+  registerDoParallel(cores=nb_of_cores_to_use)
+
+  cases_to_process <- expand.grid( list("where_are_saved_plume_results" = where_are_saved_plume_results, 
+                                        "Zone" = Zone, 
+                                        "Data_source" = Data_source, 
+                                        "Variable" = "SPM", 
+                                        "Satellite_sensor" = Satellite_sensor, 
+                                        "atmospheric_correction" = atmospheric_correction, 
+                                        'PLUME_DETECTION' = 'PLUME_DETECTION', 
+                                        "Time_resolution" = Time_resolution, 
+                                        "Years" = Years %>% as.character()) )
+
+  ts_data <- cases_to_process %>%
+    
         adply(1, function(row) {
 
-          file_path <- row %>% as_vector() %>% paste(collapse = "/")
-          
-          files_to_load <- Satellite_sensor %>% 
-                            laply(function(x) file_path %>% str_replace('Satellite_sensor', x)) %>% 
-                            list.files( pattern = ".csv", full.names = TRUE, recursive = TRUE ) 
-          
-          if (files_to_load %>% is_empty()) {return()}
-          
-          data <- files_to_load %>%  
-            ldply( function(file_to_load) {
-              read.csv(file_to_load, stringsAsFactors = FALSE, colClasses = c("date" = "character")) %>% 
-                mutate(date = date %>% as.Date(format = "%Y-%m-%d"),
-                       Satellite_sensor = file_to_load %>% 
-                                            str_extract(pattern = paste(row$Var4, '/[A-Za-z]*/', sep = '')) %>% 
-                                            str_remove_all(paste('[/', row$Var4 ,']', sep = '|')),
-                       path_to_file = file_to_load %>% str_remove('/[A-Za-z]*.csv'))  
-              
-            }  ) %>% bind_cols(row)
-          
-          make_the_plot_from_the_df(data)       
-          
-          return(data)
+          file_to_load <- list.files(row %>% as_vector() %>% paste(collapse = "/"), pattern = ".csv", full.names = TRUE, recursive = TRUE )
             
-        })
-  
-  if (ts_data %>% nrow() == 0) {print("No file found"); return()}
-  
-  global_cases_to_process <- expand.grid(where_are_saved_plume_results, Zone, Data_source, "SPM", "*", 
-                                         "*", 'PLUME_DETECTION', Time_resolution)
-  
-  global_cases_to_process %>% 
-    
-    a_ply(1, function(row) {
-    
-      file_path <- row %>% as_vector() %>% paste(collapse = "/")
-      
-      ts_data_of_the_case <- ts_data %>% 
-                              filter(Var3 == row$Var3, Var8 == row$Var8) %>% 
-                              mutate(path_to_file = file_path %>% str_remove_all('[*][A-Za-z0-9/_-]*'))
-      
-      save_file_as_csv(ts_data_of_the_case, 
-                       file.path(ts_data_of_the_case$path_to_file[1], paste('Time_series_of', 
-                                                                         tolower(ts_data_of_the_case$Var8[1]), 
-                                                                         'plume_area_and_SPM_threshold', sep = "_")))
+          if (file_to_load %>% is_empty()) {return()}
 
-      make_the_plot_from_the_df(data = ts_data_of_the_case)                   
-    
-  })
+          data <- read.csv(file_to_load, stringsAsFactors = FALSE, colClasses = c("date" = "character")) %>%
+                  mutate(date = date %>% as.Date(format = "%Y-%m-%d"))
+
+          where_to_save_the_file = file_to_load %>% str_replace(where_are_saved_plume_results, where_to_save_plume_time_series) %>% str_remove('/[A-Za-z]*.csv')
+          
+          make_the_plot_from_the_df(data, row, where_to_save_the_file, "Time_series_of_plume_area_and_SPM_threshold")
+
+          return(data)
+
+        }, .parallel = TRUE, .inform = TRUE)
+
+  if (ts_data %>% nrow() == 0) {print("No file found"); return()}
+
+  global_cases_to_process <- expand.grid( list("where_are_saved_plume_results" = where_are_saved_plume_results, 
+                                        "Zone" = Zone, 
+                                        "Data_source" = "*", 
+                                        "Variable" = "SPM", 
+                                        "Satellite_sensor" = "*", 
+                                        "atmospheric_correction" = "*", 
+                                        'PLUME_DETECTION' = 'PLUME_DETECTION', 
+                                        "Time_resolution" = Time_resolution) )
+
+  global_cases_to_process %>%
+
+    a_ply(1, function(row) {
+
+      file_path <- row %>% as_vector() %>% paste(collapse = "/")
+
+      ts_data_of_the_case <- ts_data %>%
+                              filter(Zone == row$Zone, Time_resolution == row$Time_resolution) %>%
+                              select(-matches( paste0("SPM_threshold_", setdiff(c("Grand.Rhone", "Petit.Rhone", "Seine"), 
+                                                                                Plumes[[row$Zone]] %>% unlist() %>% str_replace(" ", "."))) )) %>% 
+                              filter_at(vars(starts_with('SPM_threshold')), ~ is.finite(.)) %>% 
+                              mutate(path_to_file = file_path %>% 
+                                       str_replace(as.character(where_are_saved_plume_results), where_to_save_plume_time_series) %>% 
+                                       str_remove_all('[*][A-Za-z0-9/_-]*')) 
+                                
+      cases <- expand.grid( list("Data_source" = unique(ts_data_of_the_case$Data_source), 
+                                  "Satellite_sensor" = unique(ts_data_of_the_case$Satellite_sensor), 
+                                  "atmospheric_correction" = unique(ts_data_of_the_case$atmospheric_correction)) )
+
+      cases %>% a_ply(1, function(case) {
+        
+        save_file_as_csv(ts_data_of_the_case %>% filter(Data_source == case$Data_source, 
+                                                        Satellite_sensor == case$Satellite_sensor, 
+                                                        atmospheric_correction == case$atmospheric_correction),
+                         file.path(ts_data_of_the_case$path_to_file[1], case$Data_source, 'SPM', case$Satellite_sensor, case$atmospheric_correction, 
+                                   row$PLUME_DETECTION, row$Time_resolution, 'Time_series_of_plume_area_and_SPM_threshold'))    
+        
+      })
+      
+      save_file_as_csv(ts_data_of_the_case,
+                       file.path(ts_data_of_the_case$path_to_file[1], row$PLUME_DETECTION,
+                                 paste('Time_series_of', row$Time_resolution ,'plume_area_and_SPM_threshold', sep = "_")))
+
+      make_the_plot_from_the_df(data = ts_data_of_the_case, row, 
+                                where_to_save_the_file = file.path(ts_data_of_the_case$path_to_file[1], row$PLUME_DETECTION),
+                                plot_name = paste('Time_series_of', row$Time_resolution, 'plume_area_and_SPM_threshold', sep = "_"))
+
+  }, .parallel = TRUE)
   
 }
