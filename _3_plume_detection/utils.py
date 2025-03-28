@@ -7,6 +7,7 @@ from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib.path import Path
+from matplotlib.patches import PathPatch
 from collections import deque
 from scipy.spatial.distance import cdist
 from concave_hull import concave_hull
@@ -302,7 +303,7 @@ def flood_fill(data, start, SPM_threshold, directions):
 
     # Begin the flood fill process
     while stack:
-        
+
         # Pop a coordinate (lat_i, lon_i) from the stack
         lat_i, lon_i = stack.pop()
 
@@ -345,7 +346,8 @@ def flood_fill(data, start, SPM_threshold, directions):
                 closest_coordinates = coordinates_to_inspect
                 
                 # Continue searching for finite values within the data array until at least 10 are found
-                while(len(closest_finite_values) < 10) : 
+                while (len(closest_finite_values) < 10) and (len(closest_coordinates) < 40000000) :
+                    # print(len(closest_coordinates))
                     closest_coordinates = [ (lat_coord + d_lat, lon_coord + d_lon) for d_lat, d_lon in directions for lat_coord, lon_coord in closest_coordinates]
                     closest_finite_values = [ data[ coordinates ] for coordinates in closest_coordinates if np.isfinite( data[ coordinates ] ) ]
                     
@@ -893,8 +895,8 @@ def Set_cloudy_regions_to_True(ds_reduced, mask_area, land_mask, SPM_threshold) 
     mask_area_to_use = mask_area.copy()
     
     # Mark all land regions as True since they are irrelevant for plume detection
-    mask_area_to_use.values[land_mask.values == True] = True
-    
+    mask_area_to_use.values[ land_mask.values | np.isfinite(ds_reduced.values) ] = True
+        
     # Label connected regions of False values in the mask
     labeled_false_array, num_false_features = label(~mask_area_to_use)
     
@@ -1173,7 +1175,7 @@ def filter_gradient_points_vectorized(gradient_values, gradient_points, absolute
 
 
 
-def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, lower_high_values_to) : 
+def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, maximal_threshold, minimal_threshold) : 
 
     """
     Finds the Suspended Particulate Matter (SPM) threshold by analyzing gradients 
@@ -1203,7 +1205,7 @@ def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, l
                                                                                    start_point = start_point, 
                                                                                    directions = directions,
                                                                                    max_steps = max_steps, # Max steps for gradient expansion
-                                                                                   lower_high_values_to=lower_high_values_to, # 7
+                                                                                   lower_high_values_to=maximal_threshold, # 7
                                                                                    create_X_intermediates_between_each_direction = 2) # Number of intermediate directions
 
     # threshold_on_gradient_values = 0.35 # 0.2 # 0.15
@@ -1212,7 +1214,7 @@ def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, l
     # are_pixels_far_from_land = pixels_far_from_land(land_mask, pixel_positions = gradient_points, distance_threshold = 20)
 
     # # Plotting the points where the gradient was computed
-    # plt.imshow(spm_map, cmap='viridis', origin = "lower", vmin = 0.5, vmax = lower_high_values_to)
+    # plt.imshow(spm_map, cmap='viridis', origin = "lower", vmin = 0.5, vmax = maximal_threshold)
     # for x, y in gradient_points.reshape(-1, gradient_points.shape[-1]) :
     #     plt.scatter(x, y, s=1)
     # plt.title("Gradient Points Following Direction Vectors")
@@ -1237,7 +1239,7 @@ def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, l
     filtered_points, _, filtered_values = filter_gradient_points_vectorized(gradient_values, gradient_points, absolute_values, land_mask,
                                                                             threshold_on_gradient_values = threshold_on_gradient_values) 
 
-    # plt.imshow(spm_map[:, :], cmap='viridis', origin = "lower", vmin = 0.1, vmax = lower_high_values_to)
+    # plt.imshow(spm_map[:, :], cmap='viridis', origin = "lower", vmin = 0.1, vmax = maximal_threshold)
     # for coords in [x for x in filtered_points]:
     #     plt.scatter(coords[0], coords[1], color='red', s=1)  # Mark the points where gradient was computed
     # plt.title("Gradient Points Following Direction Vectors")
@@ -1245,9 +1247,7 @@ def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, l
 
     # Compute the SPM threshold as the 10th percentile of filtered values
     # SPM_threshold = np.nanmin( filtered_values )
-    SPM_threshold = np.nanquantile(filtered_values, 0.15) # 0.1 # 0.25
-    if SPM_threshold < 0.5 : 
-        SPM_threshold = 0.5
+    SPM_threshold = np.max( [np.nanquantile(filtered_values, 0.25), minimal_threshold] ) # 0.1 # 0.25
     
     return SPM_threshold
 
@@ -1658,7 +1658,8 @@ def define_parameters(Zone) :
         maximal_bathymetric_for_zone_with_resuspension = {'Seine' : 30}
         minimal_distance_from_estuary_for_zone_with_resuspension = {'Seine' : 30}
         max_steps_for_the_directions = {'Seine' : 50}
-        lower_high_values_to = 7
+        maximal_threshold = 20 # 15
+        minimal_threshold = 8
         river_mouth_to_exclude = {'Canal de Caen à la mer' : [49.296, -0.245]}
         
         
@@ -1706,7 +1707,8 @@ def define_parameters(Zone) :
         maximal_bathymetric_for_zone_with_resuspension = {'Gironde' : 20, 'Charente' : 20, 'Sevre' : 20}
         minimal_distance_from_estuary_for_zone_with_resuspension = {'Gironde' : 30, 'Charente' : 20, 'Sevre' : 20}
         max_steps_for_the_directions = {'Gironde' : 100, 'Charente' : 50, 'Sevre' : 50}
-        lower_high_values_to = 10
+        maximal_threshold = 10
+        minimal_threshold = 0
         river_mouth_to_exclude = {}
     
     if Zone == "GULF_OF_LION" :   
@@ -1743,7 +1745,8 @@ def define_parameters(Zone) :
         maximal_bathymetric_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
         minimal_distance_from_estuary_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
         max_steps_for_the_directions = {'Grand Rhone' : 35, 'Petit Rhone' : 35}
-        lower_high_values_to = 3
+        maximal_threshold = 3
+        minimal_threshold = 0.75
         river_mouth_to_exclude = {}
         
     if Zone == 'EASTERN_CHANNEL' :
@@ -1868,7 +1871,8 @@ def define_parameters(Zone) :
             'maximal_bathymetric_for_zone_with_resuspension' : maximal_bathymetric_for_zone_with_resuspension,
             'minimal_distance_from_estuary_for_zone_with_resuspension' : minimal_distance_from_estuary_for_zone_with_resuspension,
             'max_steps_for_the_directions' : max_steps_for_the_directions,
-            'lower_high_values_to' : lower_high_values_to,
+            'maximal_threshold' : maximal_threshold,
+            'minimal_threshold' : minimal_threshold,
             'river_mouth_to_exclude' : river_mouth_to_exclude,
             'searching_strategy_directions' : searching_strategy_directions}
         
@@ -2305,7 +2309,7 @@ def Check_if_the_area_is_too_cloudy(dataset, map_wo_clouds, parameters) :
     return test
 
 
-def fast_delimitation_of_a_river_plume_area(   spm_map, land_mask, start_point, SPM_threshold, max_steps = 20) : 
+def fast_delimitation_of_a_river_plume_area(   spm_map, land_mask, start_point, SPM_threshold, minimal_threshold, max_steps = 20) : 
     
     """
     Delimits a river plume area based on a Suspended Particulate Matter (SPM) map 
@@ -2363,7 +2367,7 @@ def fast_delimitation_of_a_river_plume_area(   spm_map, land_mask, start_point, 
                                                                                    start_point = start_point, 
                                                                                    directions = directions['directions'],
                                                                                    max_steps = max_steps, # Max steps for gradient expansion
-                                                                                   lower_high_values_to = np.min( [SPM_threshold*5, 7] ),
+                                                                                   lower_high_values_to = np.min( [SPM_threshold*5, minimal_threshold] ),
                                                                                    create_X_intermediates_between_each_direction = 2) # Number of intermediate directions
 
     if gradient_values is None : 
@@ -2451,7 +2455,7 @@ def Pipeline_to_delineate_the_plume(ds_reduced,
                                        plume_name)
             
     the_plume.determine_SPM_threshold()
-    # the_plume.SPM_threshold = 0.75
+    # the_plume.SPM_threshold = 10
     
     the_plume.do_a_raw_plume_detection()
     # the_plume.plume_mask.plot()
@@ -2585,13 +2589,22 @@ class Create_the_plume_mask :
             User-specified SPM threshold. If False, the threshold is determined automatically.
         """
         
+        # spm_map = self.spm_map
+        # land_mask = self.land_mask
+        # start_point = self.parameters['pixel_starting_points'][self.plume_name]
+        # directions = self.parameters['searching_strategy_directions'][self.plume_name]
+        # max_steps = self.parameters['max_steps_for_the_directions'][self.plume_name]
+        # maximal_threshold = self.parameters['maximal_threshold']
+        # minimal_threshold = self.parameters['minimal_threshold']
+        
         if manual_determination_of_SPM_threshold is None : 
             SPM_threshold = find_SPM_threshold(spm_map = self.spm_map, 
                                                 land_mask = self.land_mask,
                                                 start_point = self.parameters['pixel_starting_points'][self.plume_name], 
                                                 directions = self.parameters['searching_strategy_directions'][self.plume_name],
                                                 max_steps = self.parameters['max_steps_for_the_directions'][self.plume_name],
-                                                lower_high_values_to = self.parameters['lower_high_values_to'])
+                                                maximal_threshold = self.parameters['maximal_threshold'],
+                                                minimal_threshold = self.parameters['minimal_threshold'])
         else : 
             SPM_threshold = manual_determination_of_SPM_threshold
                 
@@ -2604,6 +2617,11 @@ class Create_the_plume_mask :
         """
         Perform the initial detection of the plume area.
         """
+        
+        # data = self.spm_map.values
+        # start = self.parameters['pixel_starting_points'][self.plume_name]
+        # SPM_threshold = self.SPM_threshold
+        # directions = self.parameters['searching_strategy_directions'][self.plume_name]
         
         mask, pixel_done = flood_fill(data = self.spm_map.values, 
                                       start = self.parameters['pixel_starting_points'][self.plume_name], 
@@ -2929,6 +2947,7 @@ class Create_the_plume_mask :
                                                                                 land_mask = self.land_mask,
                                                                                 start_point = position_of_a_river_mouth,
                                                                                 SPM_threshold = self.SPM_threshold,
+                                                                                minimal_threshold = self.parameters['minimal_threshold'],
                                                                                 max_steps = 20)
             
             if delimitation_of_the_plume is None : 

@@ -139,7 +139,9 @@ def apply_plume_mask(core_arguments, Zones, detect_plumes_on_which_temporal_reso
         #           france_shapefile, 
         #           map_wo_clouds,
         #           land_mask,
-        #           inside_polygon_mask)
+        #           inside_polygon_mask,
+        #           where_to_save_plume_results,
+        #           where_are_saved_regional_maps)
             
     # global_cases_to_process = cases_to_process.drop(['Year'], axis = 1).drop_duplicates().reset_index(drop = True)
         

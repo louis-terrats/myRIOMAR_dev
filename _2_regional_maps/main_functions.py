@@ -25,7 +25,7 @@ def create_regional_maps(core_arguments, Zones, overwrite_existing_regional_maps
         maps_creation = Create_and_save_the_maps(where_to_save_regional_maps, where_are_saved_satellite_data, info) 
         
         if ('map_files' not in vars(maps_creation)) or len(maps_creation.map_files) == 0 : 
-            print(f"Switch to the next iterate")
+            print("Switch to the next iterate")
             continue
         
         if maps_creation.are_the_maps_already_produced and (overwrite_existing_regional_maps == False) : 

@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
-import sys
+import sys, os
 from scipy.stats import f, kruskal, norm, chi2, t
 from scipy import stats
+import matplotlib.pyplot as plt
 
 
 #### Main
@@ -370,6 +371,77 @@ def temporal_decomp_V2_7_x11(values, dates, time_frequency,
 
 
 #### Utils
+
+def apply_X11_method_and_save_results(values, variable_name, dates, info, where_to_save_X11_results) :
+    
+    filtered_values, filtered_dates = keep_the_dates_within_full_year(values, pd.to_datetime(dates))
+    
+    results = temporal_decomp_V2_7_x11(values = filtered_values, dates = filtered_dates, 
+                                       time_frequency = info.Temporal_resolution,
+                                        filter_outlier=False, overall_cutoff=50, 
+                                        out_limit=3, perc_month_limit=50, 
+                                        var_stationary=False, lin_interpol=False, 
+                                        cutoff_fill=30, season_test=True)
+    
+    
+    fig, axs = plt.subplots(4, 1, figsize=(24, 14))
+    
+    axs[0].plot(results['7_dates'], results['8_values_ini'])
+    axs[0].set_title('Initial values')
+    axs[1].plot(results['7_dates'], results['10_Interannual_signal'])
+    axs[1].set_title(f'Inter-annual signal ({round(results["1_variance_due_to_Interannual_signal"], 1)}%)')
+    axs[2].plot(results['7_dates'], results['9_Seasonal_signal'])
+    axs[2].set_title(f'Seasonal signal ({round(results["0_variance_due_to_Seasonal_signal"], 1)}%)')
+    axs[3].plot(results['7_dates'], results['11_Residual_signal'])
+    axs[3].set_title(f'Residual signal ({round(results["2_variance_due_to_Residual_signal"], 1)}%)')
+    
+    # Adjust layout       
+    plt.tight_layout()
+
+    folder_where_to_store_the_plot = os.path.join(where_to_save_X11_results, 'X11_analysis', variable_name) 
+    os.makedirs(folder_where_to_store_the_plot, exist_ok=True)
+    file_name = "_".join(info.drop(["Year", "Satellite_variable"]).astype(str).values)
+
+    plt.savefig(folder_where_to_store_the_plot + "/" + file_name + '.png')
+    
+    plt.close(fig)
+    
+    pd.DataFrame({'dates' : results['7_dates'],
+                    'Raw_signal' : results['8_values_ini'],
+                    'Interannual_signal' : results['10_Interannual_signal'],
+                    'Seasonal_signal' : results['9_Seasonal_signal'],
+                    'Residual_signal' : results['11_Residual_signal'],
+                    'Variation_coefficient' : results['5_var_coeff'],
+                    'Variance_due_to_Interannual_signal' : results['1_variance_due_to_Interannual_signal'],
+                    'Variance_due_to_Seasonal_signal' : results['0_variance_due_to_Seasonal_signal'],
+                    'Variance_due_to_Residual_signal' : results['2_variance_due_to_Residual_signal'],
+                    'Monotonic_change' : results['18_Kendall_Sen_analyses_on_Interannual_signal']['Is_the_change_of_annual_values_monotonic'],
+                    'Rate_of_Change' : results['18_Kendall_Sen_analyses_on_Interannual_signal']['Rate_of_change_of_annual_values_in_percentage_per_time']
+                    }).to_csv(folder_where_to_store_the_plot + "/" + file_name + '.csv', index = False)
+
+def keep_the_dates_within_full_year(values, dates) : 
+
+    min_date = dates.min()
+    max_date = dates.max()    
+
+    if any(dates <= min_date.replace(month=1, day=1)):
+        start_date = min_date.replace(month=1, day=1)
+    else:
+        start_date = (min_date + pd.DateOffset(years=1)).replace(month=1, day=1)
+    
+    if any(dates >= max_date.replace(month=12, day=31)):
+        end_date = max_date.replace(month=12, day=31)
+    else:
+        end_date = (max_date - pd.DateOffset(years=1)).replace(month=12, day=31)
+    
+    # Filter values within the determined date range
+    index_to_keep = [i for i, d in enumerate(dates) if start_date <= d <= end_date]
+    
+    filtered_values = np.array(values)[index_to_keep]
+    filtered_dates = np.array(dates)[index_to_keep]
+    
+    return filtered_values, filtered_dates
+
 
 def generate_lagged_matrix(series, p):
     n = len(series)

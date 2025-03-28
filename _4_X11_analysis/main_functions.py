@@ -9,8 +9,9 @@ Created on Fri Jan 10 11:40:41 2025
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from myRIOMAR_dev._4_X11_analysis.utils import (temporal_decomp_V2_7_x11)
-from utils import get_all_cases_to_process_for_regional_maps_or_plumes_or_X11, path_to_fill_to_where_to_save_satellite_files, fill_the_sat_paths
+from myRIOMAR_dev._4_X11_analysis.utils import (temporal_decomp_V2_7_x11, apply_X11_method_and_save_results)
+from utils import (get_all_cases_to_process_for_regional_maps_or_plumes_or_X11, path_to_fill_to_where_to_save_satellite_files, 
+                   fill_the_sat_paths, load_csv_files_in_the_package_folder)
 
 
 ### S'INSPIRER DE LA FONCTION DNAS LE DOSSIER SCRIPTS
@@ -18,7 +19,8 @@ from utils import get_all_cases_to_process_for_regional_maps_or_plumes_or_X11, p
 def Apply_X11_method_on_time_series(core_arguments, Zones, nb_of_cores_to_use,
                                     on_which_temporal_resolution_the_plumes_have_been_detected,
                                     where_are_saved_plume_time_series,
-                                    where_to_save_X11_results) :
+                                    where_to_save_X11_results,
+                                    include_river_flow = False) :
 
     core_arguments.update({'Zones' : Zones,
                            'Years' : "*",
@@ -44,49 +46,25 @@ def Apply_X11_method_on_time_series(core_arguments, Zones, nb_of_cores_to_use,
         if os.path.exists(file_names_pattern) == False : 
             print(f'File does not exists : {file_names_pattern}')
             continue
-            
+        
         ts_data = pd.read_csv(file_names_pattern)
-    
-        results = temporal_decomp_V2_7_x11(values = ts_data[var_to_use].tolist(), dates = pd.to_datetime(ts_data.date), 
-                                           time_frequency = info.Temporal_resolution,
-                                            filter_outlier=False, overall_cutoff=50, 
-                                            out_limit=3, perc_month_limit=50, 
-                                            var_stationary=False, lin_interpol=False, 
-                                            cutoff_fill=30, season_test=True)
         
+        apply_X11_method_and_save_results(values = ts_data[var_to_use].tolist(), variable_name = var_to_use, 
+                                          dates = ts_data.date, info = info, 
+                                          where_to_save_X11_results = where_to_save_X11_results)
         
-        fig, axs = plt.subplots(4, 1, figsize=(24, 14))
-        
-        axs[0].plot(results['7_dates'], results['8_values_ini'])
-        axs[0].set_title('Initial values')
-        axs[1].plot(results['7_dates'], results['10_Interannual_signal'])
-        axs[1].set_title(f'Inter-annual signal ({round(results["1_variance_due_to_Interannual_signal"], 1)}%)')
-        axs[2].plot(results['7_dates'], results['9_Seasonal_signal'])
-        axs[2].set_title(f'Seasonal signal ({round(results["0_variance_due_to_Seasonal_signal"], 1)}%)')
-        axs[3].plot(results['7_dates'], results['11_Residual_signal'])
-        axs[3].set_title(f'Residual signal ({round(results["2_variance_due_to_Residual_signal"], 1)}%)')
-        
-        # Adjust layout       
-        plt.tight_layout()
-    
-        folder_where_to_store_the_plot = os.path.join(where_to_save_X11_results, 'X11_analysis', var_to_use) 
-        os.makedirs(folder_where_to_store_the_plot, exist_ok=True)
-        file_name = "_".join(info.drop(["Year", "Satellite_variable"]).astype(str).values)
+        if include_river_flow :
+            
+            river_flow_data = load_csv_files_in_the_package_folder(RIVER_FLOW = True, Zone_of_river_flow = info.Zone)
+            
+            apply_X11_method_and_save_results(values = river_flow_data.Values.tolist(), variable_name = 'river_flow', 
+                                              dates = river_flow_data.Date, 
+                                              info = info.replace({info.Satellite_variable : "River_flow",
+                                                                   info.atmospheric_correction : "",
+                                                                   info.sensor_name : "",
+                                                                   info.Data_source : "River_flow"}), 
+                                              where_to_save_X11_results = where_to_save_X11_results)
+            
 
-        plt.savefig(folder_where_to_store_the_plot + "/" + file_name + '.png')
         
-        plt.close(fig)
         
-        pd.DataFrame({'dates' : results['7_dates'],
-                        'Raw_signal' : results['8_values_ini'],
-                        'Interannual_signal' : results['10_Interannual_signal'],
-                        'Seasonal_signal' : results['9_Seasonal_signal'],
-                        'Residual_signal' : results['11_Residual_signal'],
-                        'Variation_coefficient' : results['5_var_coeff'],
-                        'Variance_due_to_Interannual_signal' : results['1_variance_due_to_Interannual_signal'],
-                        'Variance_due_to_Seasonal_signal' : results['0_variance_due_to_Seasonal_signal'],
-                        'Variance_due_to_Residual_signal' : results['2_variance_due_to_Residual_signal'],
-                        'Monotonic_change' : results['18_Kendall_Sen_analyses_on_Interannual_signal']['Is_the_change_of_annual_values_monotonic'],
-                        'Rate_of_Change' : results['18_Kendall_Sen_analyses_on_Interannual_signal']['Rate_of_change_of_annual_values_in_percentage_per_time']
-                        }).to_csv(folder_where_to_store_the_plot + "/" + file_name + '.csv', index = False)
-    

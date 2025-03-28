@@ -489,22 +489,24 @@ def extract_and_format_date_from_path(path):
     match = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', path)
     return ''.join(match.groups()) if match else None   
 
-def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False, FRANCE_shapefile = False):
+
+def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False, FRANCE_shapefile = False, 
+                                         RIVER_FLOW = False, Zone_of_river_flow = None):
     
     if SOMLIT : 
-        with importlib.resources.open_text('myRIOMAR_dev._1_data_validation.INSITU_data.SOMLIT', 'Somlit.csv') as f:
+        with importlib.resources.open_text('myRIOMAR_dev.DATA.INSITU_data.SOMLIT', 'Somlit.csv') as f:
             return (pd.read_csv(f, sep = ";", header = 2).iloc[1:]
                                 .rename(columns = {'gpsLat*':'LATITUDE', 
                                                    'gpsLong*':'LONGITUDE',
                                                    'nomSite*':"Site"}))
         
     if REPHY : 
-        with importlib.resources.open_binary('myRIOMAR_dev._1_data_validation.INSITU_data.REPHY', 'Table1_REPHY_hydro_RIOMAR.csv.gz') as f:
+        with importlib.resources.open_binary('myRIOMAR_dev.DATA.INSITU_data.REPHY', 'Table1_REPHY_hydro_RIOMAR.csv.gz') as f:
             return pd.read_csv(f, sep = ";", header = 0, encoding="ISO-8859-1", compression = {'method' : 'gzip'})
         
     if FRANCE_shapefile : 
         
-        shp_folder = importlib.resources.files('myRIOMAR_dev._3_plume_detection.FRANCE_shapefile')  # Directly get the package folder path
+        shp_folder = importlib.resources.files('myRIOMAR_dev.DATA.FRANCE_shapefile')  # Directly get the package folder path
     
         with tempfile.TemporaryDirectory() as tmp_dir:
             # Extract all necessary shapefile components
@@ -517,5 +519,64 @@ def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False, FRANCE_s
             shapefile_path = os.path.join(tmp_dir, 'gadm41_FRA_0.shp')
             return gpd.read_file(shapefile_path)
 
+    if RIVER_FLOW : 
+        
+        where_are_river_data = 'myRIOMAR_dev.DATA.RIVER_FLOW.' + Zone_of_river_flow
+        
+        files_to_load = importlib.resources.files( where_are_river_data )
+        
+        files_to_read = [f for f in files_to_load.iterdir() if f.suffix in ('.txt', '.dat', '.csv', '.ascii')]
+
+        # Load each file into a dictionary of DataFrames
+        data_dict = {}
+        for file in files_to_read:
+            ext = file.suffix.lower()
+            if ext == '.csv':
+                df = pd.read_csv(file)
+            if ext == '.ascii' : 
+                df = pd.DataFrame( np.loadtxt(file) )
+            else:
+                df = pd.read_table(file, sep=None, engine='python', header = None)  # Auto-detect separator
+            data_dict[file.name] = df  # Store in dictionary
+                    
+        for key, the_df in data_dict.items() : 
+            
+            if Zone_of_river_flow == 'GULF_OF_LION' :
+                
+                the_df.columns = ['Flow', 'Year', 'Month', 'Day']
+                the_df['Date'] = pd.to_datetime(the_df['Year'].astype(int).astype(str) + '-' + 
+                                                the_df['Month'].apply(lambda x: str(int(x)).zfill(2)) + '-' + 
+                                                the_df['Day'].apply(lambda x: str(int(x)).zfill(2)) ) 
+                
+            if np.isin( Zone_of_river_flow, ['BAY_OF_BISCAY', 'SOUTHERN_BRITTANY', 'BAY_OF_SEINE']) :
+                
+                the_df.columns = ['Date', 'Time', 'Flow']
+                the_df['Date'] = pd.to_datetime(the_df['Date'], format = "%d/%m/%Y" ) 
+
+            data_dict[key] = the_df.loc[:,['Flow', 'Date']]
+    
+        final_df = pd.concat(data_dict.values()).groupby("Date", as_index=False).agg(Values=('Flow', 'sum'), n_rivers=('Flow', 'count'))
+        final_df = final_df[ final_df.n_rivers == len(files_to_read) ]
+        
+        return final_df
+                
     
     
+        # bin_centers = [4, 12, 20, 28]
+        # def assign_bin(day):
+        #     return min(bin_centers, key=lambda x: abs(x - day))
+        
+        # # Apply the function to create a 'bin' column
+        # river_ts['bin'] = river_ts['Date'].dt.day.apply(assign_bin)
+        # river_ts_reduced = river_ts.loc[:,['Date', 'bin', var_to_use]]
+        # river_ts_reduced[var_to_use] = pd.to_numeric(river_ts_reduced[var_to_use])
+        
+        # if Time_resolution == 'WEEKLY' : 
+        #     river_ts_binned = river_ts_reduced.groupby([river_ts_reduced['Date'].dt.to_period('M'), 'bin']).agg({var_to_use: 'mean'}).reset_index()
+        #     river_ts_binned.index = pd.to_datetime( river_ts_binned['Date'].astype(str) + "-" + river_ts_binned['bin'].astype(str), format = "%Y-%m-%d" )
+            
+        # if Time_resolution == 'MONTHLY' :     
+        #     river_ts_binned = river_ts_reduced.groupby([river_ts_reduced['Date'].dt.to_period('M')]).agg({var_to_use: 'mean'}).reset_index()
+        #     river_ts_binned.index = pd.to_datetime( river_ts_binned['Date'].astype(str) + "-" + "15", format = "%Y-%m-%d" )
+            
+        # ts_data = river_ts_binned.sort_index()

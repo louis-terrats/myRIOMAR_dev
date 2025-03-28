@@ -86,8 +86,8 @@ def Process_each_week(Year_month_week_pattern,
     #         weekly_results = weekly_results[1:]
         
     # Save daily maps to pickle files
-    [pickle.dump(x[1], open(f"{where_to_save_data_extended.replace('[TIME_FREQUENCY]', 'DAILY')}/{x[0].day[0]}.pkl", 'wb')) for x in weekly_results if isinstance(x, list)]
-           
+    [pickle.dump({'Basin_map' : x[1]}, open(f"{where_to_save_data_extended.replace('[TIME_FREQUENCY]', 'DAILY')}/{x[0].day[0]}.pkl", 'wb')) for x in weekly_results if isinstance(x, list)]
+               
     # Index the files for the current week                 
     map_files_of_the_week_index = [ all_days_of_the_year.index(date) for date in [extract_and_format_date_from_path(x) for x in map_files_of_the_week ] ]
 
@@ -173,6 +173,7 @@ def load_file_and_extract_key_data(nc_file, info, where_to_save_data_extended, d
     info['year'] = pd.to_datetime(date).strftime("%Y") 
     nb_of_day = pd.to_datetime(date).strftime("%d")     
     info['week'] = f'{info.month}_{determine_the_week_based_on_the_day(nb_of_day)}'
+    info['date_for_plot'] = info.day
     
     # Sort data by latitude and longitude
     map_ini = map_ini.sortby('lat')
@@ -332,6 +333,8 @@ def extract_key_data(map_ini, info,
     sd_of_the_zone = np.exp( map_of_the_zone_log_scale.std() )
     n_of_the_zone = np.isfinite(map_of_the_zone_log_scale.values).sum()
     n_tot_of_the_zone = map_of_the_zone_log_scale.shape[0] * map_of_the_zone_log_scale.shape[1]
+    
+    map_values_of_the_zone = map_values_of_the_zone.assign_coords(date_for_plot = info.date_for_plot )
     
     return {'map_data' : map_values_of_the_zone,
             'mean' : float(mean_of_the_zone),
@@ -1102,7 +1105,7 @@ class Create_and_save_the_maps :
             all_days_of_the_year = pd.date_range(start=info.date_min, end=info.date_max, freq="YE").strftime("%Y%m%d").tolist()
 
             map_files = find_sat_data_files(info, 
-                                            fill_the_sat_paths(info, 
+                                            fill_the_sat_paths(info.replace({info.Temporal_resolution : "DAILY"}),
                                                                (path_to_fill_to_where_to_save_satellite_files(f'{where_to_save_regional_maps}/{info.Zone}').replace('/[MONTH]/[DAY]', '').replace('[TIME_FREQUENCY]', 'MAPS/[TIME_FREQUENCY]')), 
                                                                local_path=True, 
                                                                dates= all_days_of_the_year))
@@ -1119,7 +1122,7 @@ class Create_and_save_the_maps :
         all_days_of_the_year = pd.date_range(start=info.date_min, end=info.date_max, freq="D").strftime("%Y%m%d").tolist()
         
         map_files = find_sat_data_files(info, 
-                                        fill_the_sat_paths(info, 
+                                        fill_the_sat_paths(info.replace({info.Temporal_resolution : "DAILY"}), 
                                                            path_to_fill_to_where_to_save_satellite_files(where_are_saved_satellite_data), 
                                                            local_path=True, 
                                                            dates= all_days_of_the_year))            
@@ -1176,6 +1179,14 @@ class Create_and_save_the_maps :
         os.makedirs(self.where_to_save_data_extended.replace('[TIME_FREQUENCY]', 'WEEKLY'), exist_ok=True)
         os.makedirs(self.where_to_save_data_extended.replace('[TIME_FREQUENCY]', 'DAILY'), exist_ok=True)
                  
+        # where_to_save_data_extended = self.where_to_save_data_extended
+        # all_days_of_the_year = self.all_days_of_the_year 
+        # suffix_ranges = self.suffix_ranges
+        # info = self.info
+        # map_files = self.map_files
+        # files_have_been_processed = self.files_have_been_processed
+        # Year_month_week_patterns = self.Year_month_week_patterns
+        
         # Use multiprocessing to process each week
         # pool = multiprocessing.Pool(nb_of_cores_to_use)
         with multiprocessing.Pool(nb_of_cores_to_use) as pool:
