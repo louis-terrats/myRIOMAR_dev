@@ -24,16 +24,3 @@ def Match_up_with_insitu_measurements(core_arguments, redo_the_MU_database, nb_o
     MU_database.Make_scatterplot_and_save_statistics()
     
     # MU_database.Make_time_series()
-
-
-
-  
-                     
-
-        
-                
-                    
-            
-
-    
-    

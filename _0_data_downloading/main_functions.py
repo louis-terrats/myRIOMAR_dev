@@ -53,17 +53,20 @@ def Plot_and_Save_the_map(core_arguments,
         
     cases_to_process = get_all_cases_to_process(core_arguments)
 
+    dates_to_plot = pd.date_range(start=start_day_of_maps_to_plot, end=end_day_of_maps_to_plot, freq="D")
+
+    # pool = multiprocessing.Pool(nb_of_cores_to_use)
     with multiprocessing.Pool(nb_of_cores_to_use) as pool:
 
-        for i in range(cases_to_process.shape[0]) : 
+        for i, info in cases_to_process.iterrows() : 
                     
-            info = cases_to_process.iloc[i].copy()
+            # info = cases_to_process.iloc[i]
             
             init = download_satellite_data(info, start_day_of_maps_to_plot, end_day_of_maps_to_plot, 
                                            where_are_saved_satellite_data, nb_of_cores_to_use) 
     
-            paths_to_sat_data = fill_the_sat_paths(info, init.destination_path_to_fill, 
+            paths_to_sat_data = fill_the_sat_paths(info.replace({info.Temporal_resolution : "DAILY"}), init.destination_path_to_fill, 
                                                    local_path = True, 
-                                                   dates = pd.date_range(start=init.start_day, end=init.end_day, freq="D"))
+                                                   dates = dates_to_plot)
             
             pool.map(_0_data_downloading.utils.plot_the_maps_in_the_folder, paths_to_sat_data)

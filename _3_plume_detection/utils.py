@@ -1707,8 +1707,8 @@ def define_parameters(Zone) :
         maximal_bathymetric_for_zone_with_resuspension = {'Gironde' : 20, 'Charente' : 20, 'Sevre' : 20}
         minimal_distance_from_estuary_for_zone_with_resuspension = {'Gironde' : 30, 'Charente' : 20, 'Sevre' : 20}
         max_steps_for_the_directions = {'Gironde' : 100, 'Charente' : 50, 'Sevre' : 50}
-        maximal_threshold = 10
-        minimal_threshold = 0
+        maximal_threshold = 12
+        minimal_threshold = 4
         river_mouth_to_exclude = {}
     
     if Zone == "GULF_OF_LION" :   
@@ -1850,7 +1850,11 @@ def define_parameters(Zone) :
         lon_range_of_the_map_to_plot = [-5, -1.5]
         lat_range_to_search_plume_area = [46.5, 47.9]
         lon_range_to_search_plume_area = [-180, 180]
-        max_steps_for_the_directions = { 'Loire' : None, 'Vilaine' : None}
+        maximal_bathymetric_for_zone_with_resuspension = {'Loire' : 20, 'Vilaine' : 20}
+        minimal_distance_from_estuary_for_zone_with_resuspension = {'Loire' : 20, 'Vilaine' : 20}
+        max_steps_for_the_directions = { 'Loire' : 100, 'Vilaine' : 50}
+        maximal_threshold = 12
+        minimal_threshold = 3
         river_mouth_to_exclude = {}
     
     searching_strategy_directions = coordinates_of_pixels_to_inspect( searching_strategies )

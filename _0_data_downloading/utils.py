@@ -808,6 +808,7 @@ class download_satellite_data :
             self.to_process = False
             Download_messages.loc[:,'Message'] = "The Data source does not distribute such data"
             self.download_report = Download_messages
+            self.destination_path_to_fill = destination_path_to_fill
             return 
         
         info['Year'] = np.unique(all_dates.year)

@@ -1,4 +1,4 @@
-list_of_packages <- c("tidyverse", "plyr", "ggpubr", "viridis", "doParallel")
+list_of_packages <- c("plyr", "tidyverse", "ggpubr", "viridis", "doParallel")
 new.packages <- list_of_packages[!(list_of_packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 lapply(list_of_packages, require, character.only = TRUE)
@@ -72,13 +72,13 @@ make_the_plot_from_the_df <- function(data, row, where_to_save_the_file, plot_na
 
 # where_are_saved_plume_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS'
 # where_to_save_plume_time_series = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS'
-# Zone = c('GULF_OF_LION', 'BAY_OF_SEINE')
+# Zone = c('BAY_OF_BISCAY', 'SOUTHERN_BRITTANY')
 # Data_source = 'SEXTANT'
 # Satellite_sensor = c('merged', 'modis')
 # atmospheric_correction = 'Standard'
 # Temporal_resolution = 'WEEKLY'
 # Years = 1998
-# Plumes = list('GULF_OF_LION' = list('Grand Rhone', 'Petit Rhone'), 'BAY_OF_SEINE' = list('Seine'))
+# Plumes = list('BAY_OF_BISCAY' = list('Gironde', 'Charente', 'Sevre'), 'SOUTHERN_BRITTANY' = list('Loire', 'Vilaine'))
 # nb_of_cores_to_use = 6
 
 plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_results, where_to_save_plume_time_series, 
@@ -127,6 +127,8 @@ plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_
                                         'PLUME_DETECTION' = 'PLUME_DETECTION', 
                                         "Temporal_resolution" = Temporal_resolution) )
 
+  plume_names <- ts_data %>% select_at(vars(starts_with('SPM_threshold_'))) %>% names() %>% str_replace_all('SPM_threshold_', '')
+  
   global_cases_to_process %>%
 
     a_ply(1, function(row) {
@@ -135,7 +137,7 @@ plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_
 
       ts_data_of_the_case <- ts_data %>%
                               filter(Zone == row$Zone, Temporal_resolution == row$Temporal_resolution) %>%
-                              select(-matches( paste0("SPM_threshold_", setdiff(c("Grand.Rhone", "Petit.Rhone", "Seine"), 
+                              select(-matches( paste0("SPM_threshold_", setdiff(plume_names, 
                                                                                 Plumes[[row$Zone]] %>% unlist() %>% str_replace(" ", "."))) )) %>% 
                               filter_at(vars(starts_with('SPM_threshold')), ~ is.finite(.)) %>% 
                               mutate(path_to_file = file_path %>% 

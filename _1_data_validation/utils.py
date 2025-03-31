@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 
+import glob, os
+
 import rpy2.robjects as robjects
 
 from utils import (add_array_to_dict, path_to_fill_to_where_to_save_satellite_files, fill_the_sat_paths,
@@ -9,7 +11,7 @@ from utils import (add_array_to_dict, path_to_fill_to_where_to_save_satellite_fi
                             return_the_parameter_name_based_on_file_name, get_non_empty_paths,
                             extract_the_time_from_the_satellite_file, access_item_in_a_dictionnary, 
                             extract_dataframes_iterative, load_csv_files_in_the_package_folder)
-import re, datetime, os, pickle, multiprocessing, gc
+import re, datetime, os, pickle, multiprocessing, gc, glob
 
 from joblib import dump, load
 
@@ -379,6 +381,7 @@ def scatterplot_and_save_statistics(MU_summary_df, info, where_are_saved_Match_U
             where_to_save_MU_results = robjects.StrVector([where_are_saved_Match_Up_data])
             
         )
+
 
 # =============================================================================
 #### Classes 

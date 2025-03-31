@@ -1,4 +1,4 @@
-import os, pickle, glob, multiprocessing, imageio, re
+import os, pickle, glob, multiprocessing, imageio, re, gc
 import pandas as pd
 import rpy2.robjects as robjects
 
@@ -84,7 +84,7 @@ def apply_plume_mask(core_arguments, Zones, detect_plumes_on_which_temporal_reso
         
         # Open the first file to extract the dataset structure.
         with open(file_names[0], 'rb') as f:
-            ds = pickle.load(f)['Basin_map']['map_data'] if info.Temporal_resolution != 'DAILY' else pickle.load(f)['map_data']                     
+            ds = pickle.load(f)['Basin_map']['map_data'] 
                 
         # Reduce the spatial resolution of the dataset to match the new resolution
         ds_reduced = ( reduce_resolution(ds, parameters['lat_new_resolution'], parameters['lon_new_resolution'])
@@ -128,6 +128,9 @@ def apply_plume_mask(core_arguments, Zones, detect_plumes_on_which_temporal_reso
             for figure_file in saved_maps :
                 image = imageio.imread(figure_file)
                 writer.append_data(image)
+                
+        del results, ds_reduced, bathymetry_data_aligned_to_reduced_map, inside_polygon_mask, map_wo_clouds, land_mask
+        gc.collect()
         
         # # For debugging
         # for file_name in file_names : 
