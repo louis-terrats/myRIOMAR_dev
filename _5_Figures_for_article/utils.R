@@ -56,6 +56,31 @@ Figure_1 <- function(where_to_save_the_figure) {
   
 }
 
+Figure_2 <- function(where_to_save_the_figure) {
+  
+  main_folder_of_Figure_2 <- file.path(where_to_save_the_figure, "ARTICLE", "FIGURES", "FIGURE_2")
+  
+  SPM_map_data <- file.path( main_folder_of_Figure_2, "DATA" ) %>% 
+                list.files(pattern = "*.csv", full.names = TRUE) %>% 
+                llply(read_csv) 
+
+  SPM_maps <- SPM_map_data %>% 
+                llply(function(x) {
+                    the_map <- create_the_basic_map(x, 'SPM')
+                    the_map <- the_map + 
+                                  guides(fill = guide_colorbar(barwidth = 60, barheight = 2, title.position = "top")) +
+                                  theme(legend.position = "top",
+                                        legend.title = element_text(angle = 0, hjust = 0.5),
+                                        axis.text = element_text(size=25, colour = "black"))
+                    return(the_map)
+                  }) %>% 
+                ggarrange(plotlist = ., common.legend = TRUE)
+  
+  save_plot_as_png(SPM_maps, "Figure_2", width = 28, height = 16, path = main_folder_of_Figure_2)
+  
+}
+
+
 
 #### Utils ####
 
@@ -65,13 +90,13 @@ create_the_basic_map <- function(map_df, var_name,
   
   if (str_detect(var_name, 'chl|CHL')) {
     title = "[Chl-a]"
-    unit = "mg m-3"
+    unit = "mg m³"
     legend_limits <- c(1e-1, 5e0)
   }
   
   if (str_detect(var_name, 'tsm|SPM|TSM')) {
     title = "[SPM]"
-    unit = "g m-3"
+    unit = "g m³"
     legend_limits <- c(1e-1, 1e1)
   }
   
@@ -82,7 +107,7 @@ create_the_basic_map <- function(map_df, var_name,
     geom_raster(data = map_df, aes(x = lon, y = lat, fill = analysed_spim), interpolate = FALSE) + 
 
     ## First layer: worldwide map
-    geom_polygon(data = map_data("world"), aes(x=long, y=lat, group = group), color = 'grey60', fill = 'white') +
+    geom_polygon(data = map_data("world"), aes(x=long, y=lat, group = group), color = 'grey60', fill = 'black') +
     ## Second layer: Country map
     geom_polygon(data = FRANCE_shapefile, aes(x=long, y=lat, group = group), color = 'grey60', fill = 'black') +
     coord_cartesian(xlim = range(map_df$lon), ylim = range(map_df$lat), expand = FALSE) +

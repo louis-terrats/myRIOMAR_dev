@@ -10,7 +10,11 @@ from utils import (add_array_to_dict, path_to_fill_to_where_to_save_satellite_fi
                             create_arborescence, find_sat_data_files,merge_dicts, get_empty_paths,
                             return_the_parameter_name_based_on_file_name, get_non_empty_paths,
                             extract_the_time_from_the_satellite_file, access_item_in_a_dictionnary, 
-                            extract_dataframes_iterative, load_csv_files_in_the_package_folder)
+                            extract_dataframes_iterative, load_csv_files_in_the_package_folder,
+                            get_the_values_from_a_list_comprehension)
+
+from _3_plume_detection.utils import define_parameters
+
 import re, datetime, os, pickle, multiprocessing, gc, glob
 
 from joblib import dump, load
@@ -20,7 +24,7 @@ from joblib import dump, load
 #### Functions
 # =============================================================================
     
-def get_insitu_measurements() : 
+def get_insitu_measurements(zones = None) : 
         
     # =============================================================================
     #     SOMLIT
@@ -130,10 +134,28 @@ def get_insitu_measurements() :
     BGC_columns = ['TEMP', 'SAL', 'POC', 'SPM', 'CHLA', 'TURB']
     INSITU_measurements[BGC_columns] = INSITU_measurements[BGC_columns].astype(float)
     
+    # INSITU_stations = INSITU_measurements.loc[:,["SOURCE", "SITE", "LATITUDE", "LONGITUDE"]].drop_duplicates().reset_index(drop = True)
+
+    if zones is not None : 
+        
+        coordinates_of_the_zones = {zone: define_parameters(zone)['lat_range_of_the_map_to_plot'] + 
+                                   define_parameters(zone)['lon_range_of_the_map_to_plot'] 
+                            for zone in zones}
+    
+        measurement_LATITUDES = INSITU_measurements.LATITUDE.to_numpy(float)
+        measurement_LONGITUDES = INSITU_measurements.LONGITUDE.to_numpy(float)
+        
+        index_of_measurements_in_the_zones = np.hstack([np.where((measurement_LATITUDES >= lat_min) & 
+                                                                 (measurement_LATITUDES <= lat_max) & 
+                                                                 (measurement_LONGITUDES >= lon_min) & 
+                                                                 (measurement_LONGITUDES <= lon_max))[0] 
+                                                        for lat_min, lat_max, lon_min, lon_max in coordinates_of_the_zones.values()])
+                
+        INSITU_measurements = INSITU_measurements.iloc[ np.unique(index_of_measurements_in_the_zones) ]
+                
     INSITU_stations = (INSITU_measurements
                        .groupby(["SOURCE", "SITE", "REGION", "LATITUDE", "LONGITUDE"], as_index = False)
                        .agg({"DATE": list}))
-    # INSITU_stations = INSITU_measurements.loc[:,["SOURCE", "SITE", "LATITUDE", "LONGITUDE"]].drop_duplicates().reset_index(drop = True)
 
     return INSITU_measurements, INSITU_stations
 
@@ -269,7 +291,7 @@ def compute_grid_stats(df, grid_size):
 def get_the_corresponding_insitu_parameter_name(satellite_variable_name) : 
     
     if 'SPM' in satellite_variable_name : 
-        return 'SPM'
+        return ['SPM', 'TURB']
     
     if 'CHL' in satellite_variable_name : 
         return 'CHLA'
@@ -289,11 +311,17 @@ def Summarize_the_matchup_database(path, MU_database) :
         
     var_name_in_INSITU_dtb = get_the_corresponding_insitu_parameter_name(path)
     
-    INSITU_values = ( MU_database['INSITU']
-                     .xs( MU_summary_df.index.get_level_values('DATE')[0], level = 'DATE')
-                     .rename(columns={var_name_in_INSITU_dtb: 'Insitu_value'})
-                     .rename_axis(index={'TIME': 'Insitu_time'})[['Insitu_value']] )
-    INSITU_values.insert(0, 'Insitu_variable', var_name_in_INSITU_dtb)
+    INSITU_values = []
+    for var_name in var_name_in_INSITU_dtb : 
+    
+        INSITU_values_of_var_name = ( MU_database['INSITU']
+                         .xs( MU_summary_df.index.get_level_values('DATE')[0], level = 'DATE')
+                         .rename(columns={var_name: 'Insitu_value'})
+                         .rename_axis(index={'TIME': 'Insitu_time'})[['Insitu_value']] )
+        INSITU_values_of_var_name.insert(0, 'Insitu_variable', var_name)
+        INSITU_values.append(INSITU_values_of_var_name)
+        
+    INSITU_values = pd.concat(INSITU_values)
     
     merged_df = (MU_summary_df.reset_index()
                  .merge(INSITU_values.reset_index(), 
@@ -335,7 +363,7 @@ def get_MU_criteria_for_each_product(info) :
     return MU_criteria
 
 
-def scatterplot_and_save_statistics(MU_summary_df, info, where_are_saved_Match_Up_data) : 
+def scatterplot_and_save_statistics(MU_summary_df, info, where_are_saved_Match_Up_data, zones) : 
 
     index_to_keep = np.where((MU_summary_df.Data_source == info.Data_source) & 
                              (MU_summary_df.sensor_name == info.sensor_name) & 
@@ -364,11 +392,13 @@ def scatterplot_and_save_statistics(MU_summary_df, info, where_are_saved_Match_U
             satellite_n = robjects.IntVector(MU_summary_df_of_the_sat_algo[f'{MU_criteria["grid_size"]}x{MU_criteria["grid_size"]}_n'].to_list()),
             satellite_sd = robjects.FloatVector(MU_summary_df_of_the_sat_algo[f'{MU_criteria["grid_size"]}x{MU_criteria["grid_size"]}_std'].to_list()),
             satellite_times = robjects.StrVector(MU_summary_df_of_the_sat_algo.Satellite_time.astype(str).to_list()),
+            insitu_variable = robjects.StrVector(MU_summary_df_of_the_sat_algo.Insitu_variable.to_list()),
             insitu_value = robjects.FloatVector(MU_summary_df_of_the_sat_algo.Insitu_value.to_list()),
             insitu_time = robjects.StrVector(MU_summary_df_of_the_sat_algo.Insitu_time.to_list()),
             insitu_Data_source = robjects.StrVector(MU_summary_df_of_the_sat_algo.SOURCE.to_list()),
             site_name = robjects.StrVector(MU_summary_df_of_the_sat_algo.SITE.to_list()),
             region_name = robjects.StrVector(MU_summary_df_of_the_sat_algo.REGION.to_list()),
+            zones = robjects.StrVector(zones),
             min_n = robjects.IntVector([MU_criteria["min_n"]]),
             max_CV = robjects.IntVector([MU_criteria["max_CV"]]),
             max_hour_diff = robjects.IntVector([MU_criteria["max_hour_diff_between_insitu_and_satellite_measurement"]]),
@@ -389,13 +419,14 @@ def scatterplot_and_save_statistics(MU_summary_df, info, where_are_saved_Match_U
 
 class MU_database_processing : 
     
-    def __init__(self, where_to_save_Match_Up_data, cases_to_process, nb_of_cores_to_use = 1, redo_the_MU_database = False) :
+    def __init__(self, where_to_save_Match_Up_data, cases_to_process, zones, nb_of_cores_to_use = 1, redo_the_MU_database = False) :
         
         grid_size = 9 # 9x9
         
-        os.makedirs( where_to_save_Match_Up_data, exist_ok=True)
+        path_to_MU_of_the_zone = os.path.join(where_to_save_Match_Up_data, "_&_".join(zones))
+        os.makedirs( path_to_MU_of_the_zone , exist_ok=True)
                      
-        path_to_the_MU_database = where_to_save_Match_Up_data + '/MU_database.joblib'
+        path_to_the_MU_database = os.path.join(path_to_MU_of_the_zone, "MU_database.joblib")
         
         if os.path.isfile(path_to_the_MU_database) and redo_the_MU_database == False : 
             MU_database = load( path_to_the_MU_database )        
@@ -407,11 +438,12 @@ class MU_database_processing :
         self.path_to_the_MU_database = path_to_the_MU_database
         self.grid_size = grid_size
         self.cases_to_process = cases_to_process
+        self.zones = zones
         self.nb_of_cores_to_use = nb_of_cores_to_use
             
     def Create_the_MU_database(self, where_are_saved_satellite_data) : 
         
-        INSITU_data, INSITU_stations = get_insitu_measurements()
+        INSITU_data, INSITU_stations = get_insitu_measurements(self.zones)
 
         MU_data = {'STATIONS' : INSITU_stations,
                    'DATES' : get_insitu_dates_for_each_parameter(INSITU_data),
@@ -435,7 +467,10 @@ class MU_database_processing :
                 filled_destination_path = fill_the_sat_paths(info = info, 
                                                              path_to_fill = filled_base_path, 
                                                              local_path = True,
-                                                             dates = MU_data['DATES'][get_the_corresponding_insitu_parameter_name(info.Satellite_variable)])
+                                                             dates = get_the_values_from_a_list_comprehension( 
+                                                                         [MU_data['DATES'][the_param] 
+                                                                          for the_param in get_the_corresponding_insitu_parameter_name(info.Satellite_variable)],
+                                                                         True))
                 
                 MU_database_of_the_case = create_arborescence( [x.replace(f'{where_are_saved_satellite_data}/', '') for x in filled_destination_path] )
                 
@@ -482,7 +517,11 @@ class MU_database_processing :
         filled_destination_paths = {
             i: fill_the_sat_paths(
                 info, path_to_fill_to_where_to_save_satellite_files(where_are_saved_satellite_data),
-                local_path=True, dates=self.MU_database['DATES'][get_the_corresponding_insitu_parameter_name(info.Satellite_variable)]
+                local_path=True,                 
+                dates = get_the_values_from_a_list_comprehension( 
+                                    [self.MU_database['DATES'][the_param] 
+                                     for the_param in get_the_corresponding_insitu_parameter_name(info.Satellite_variable)],
+                                    True)
             )
             for i, info in self.cases_to_process.iterrows()
         }
@@ -584,7 +623,7 @@ class MU_database_processing :
             df = list(df)
             return pd.concat(df)
         
-        base_path_to_save_data = self.path_to_the_MU_database.replace('database.joblib', '')
+        base_path_to_save_data = "/".join(self.path_to_the_MU_database.split('/')[:-1])
         
         if self.any_modification_has_been_done == False :          
 
@@ -610,11 +649,12 @@ class MU_database_processing :
         MU_summary_df = self.MU_summary_df.reset_index(drop = False)
         where_to_save_Match_Up_plots = self.where_to_save_Match_Up_data
         cases_to_process = self.cases_to_process
+        zones = self.zones
         
         with multiprocessing.Pool(self.nb_of_cores_to_use) as pool:
             
             pool.starmap(scatterplot_and_save_statistics, 
-                         [(MU_summary_df, case_to_process, where_to_save_Match_Up_plots) 
+                         [(MU_summary_df, case_to_process, where_to_save_Match_Up_plots, zones) 
                           for _, case_to_process in cases_to_process.iterrows() ])
         
         # Get all statistics .csv files

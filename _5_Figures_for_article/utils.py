@@ -10,11 +10,12 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 
-import glob, os
+import glob, os, pickle
 
 from utils import path_to_fill_to_where_to_save_satellite_files
 from _3_plume_detection.utils import define_parameters
 from _1_data_validation.utils import get_insitu_measurements
+
                    
 def save_files_for_Figure_1(where_are_saved_satellite_data, where_to_save_the_figure, 
                             date_of_the_map, coordinates_of_the_map) :
@@ -61,3 +62,32 @@ def save_files_for_Figure_1(where_are_saved_satellite_data, where_to_save_the_fi
     stations_in_the_RIOMARS = insitu_stations.iloc[index_of_stations_in_the_RIOMARS]
     
     stations_in_the_RIOMARS.to_csv(folder_where_to_save_Figure_1_data + "/Stations_position.csv")
+    
+    
+def load_the_regional_maps_and_save_them_for_plotting(where_are_saved_regional_maps, where_to_save_the_figure, dates_for_each_zone) :
+        
+    folder_where_to_save_Figure_2_data = os.path.join(where_to_save_the_figure, 'ARTICLE', 'FIGURES', 'FIGURE_2', 'DATA')
+    os.makedirs(folder_where_to_save_Figure_2_data, exist_ok = True)
+    
+    path_to_regional_maps = {key : (path_to_fill_to_where_to_save_satellite_files( os.path.join(where_are_saved_regional_maps, 'RESULTS', key) )
+                                       .replace('[DATA_SOURCE]/[PARAMETER]/[SENSOR]/[ATMOSPHERIC_CORRECTION]/[TIME_FREQUENCY]',
+                                                'SEXTANT/SPM/merged/Standard/MAPS/DAILY')
+                                       .replace('[YEAR]/[MONTH]/[DAY]', f'{date[:4]}/{date}.pkl')) 
+                               for key, date in dates_for_each_zone.items()}
+    
+    for key, path_to_map in path_to_regional_maps.items() : 
+    
+        coordinates_of_the_map = define_parameters(key)    
+    
+        with open(path_to_map, 'rb') as f:
+            ds = pickle.load(f)['Basin_map']['map_data']  
+            
+            SPM_map = (ds
+                       .sel(lat=slice(coordinates_of_the_map['lat_range_of_the_map_to_plot'][0], 
+                                      coordinates_of_the_map['lat_range_of_the_map_to_plot'][1]), 
+                            lon=slice(coordinates_of_the_map['lon_range_of_the_map_to_plot'][0],
+                                      coordinates_of_the_map['lon_range_of_the_map_to_plot'][1])) 
+                       .to_dataframe()
+                       .reset_index())
+            
+            SPM_map.to_csv(folder_where_to_save_Figure_2_data + f"/{key}.csv")

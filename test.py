@@ -63,8 +63,9 @@ myRIOMAR._Add_my_zone(name = 'THAY', min_lat = 9, max_lat = X)
 #%% Match-up with SOMLIT and REPHY stations
 
 myRIOMAR._1_data_validation.Match_up_with_insitu_measurements(core_arguments, 
-                                                              redo_the_MU_database = False, 
-                                                              nb_of_cores_to_use = 6,
+                                                              zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
+                                                              redo_the_MU_database = True, 
+                                                              nb_of_cores_to_use = 4,
                                                               where_are_saved_satellite_data = "/media/terrats/My Book/LOUIS_TERRATS/RIOMAR/DATA/OCEAN_COLOR/",
                                                               where_to_save_Match_Up_data = "/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/")
 
@@ -89,7 +90,8 @@ myRIOMAR._2_regional_maps.create_regional_maps(core_arguments,
 #%% Detect the plumes
 
 myRIOMAR._3_plume_detection.apply_plume_mask(core_arguments,
-                                             Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
+                                             # Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
+                                             Zones = ['GULF_OF_LION'],
                                              detect_plumes_on_which_temporal_resolution_data = 'DAILY',
                                              nb_of_cores_to_use = 4,
                                              where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS",
@@ -98,9 +100,9 @@ myRIOMAR._3_plume_detection.apply_plume_mask(core_arguments,
 #%% Plot time-series of plume surface
 
 myRIOMAR._3_plume_detection.make_and_plot_time_series_of_plume_areas(core_arguments,
-                                                     Zones = ['SOUTHERN_BRITTANY', 'BAY_OF_BISCAY'],
+                                                     Zones = ['GULF_OF_LION'],
                                                      nb_of_cores_to_use = 4,
-                                                     on_which_temporal_resolution_the_plumes_have_been_detected = 'WEEKLY',
+                                                     on_which_temporal_resolution_the_plumes_have_been_detected = 'DAILY',
                                                      where_are_saved_plume_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS",
                                                      where_to_save_plume_time_series = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS")
 
@@ -108,7 +110,7 @@ myRIOMAR._3_plume_detection.make_and_plot_time_series_of_plume_areas(core_argume
 #%% Do X11 analysis on plume time-series
 
 myRIOMAR._4_X11_analysis.Apply_X11_method_on_time_series(core_arguments,
-                                            Zones = ['SOUTHERN_BRITTANY', 'BAY_OF_BISCAY'],
+                                            Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
                                             nb_of_cores_to_use = 4,
                                             on_which_temporal_resolution_the_plumes_have_been_detected = 'WEEKLY',
                                             where_are_saved_plume_time_series = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS",
@@ -116,10 +118,12 @@ myRIOMAR._4_X11_analysis.Apply_X11_method_on_time_series(core_arguments,
                                             include_river_flow = True)
 
 
-
 #%% Figures_for_the_article
 
 #%% Figure 1
 
 myRIOMAR._5_Figures_for_article.Figure_1(where_are_saved_satellite_data = "/media/terrats/My Book/LOUIS_TERRATS/RIOMAR/DATA/OCEAN_COLOR/",
+                                         where_to_save_the_figure = "/home/terrats/Desktop/RIOMAR/TEST/")
+
+myRIOMAR._5_Figures_for_article.Figure_2(where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/",
                                          where_to_save_the_figure = "/home/terrats/Desktop/RIOMAR/TEST/")

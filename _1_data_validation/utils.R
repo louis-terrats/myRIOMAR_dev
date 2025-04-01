@@ -13,10 +13,11 @@ lapply(list_of_packages, require, character.only = TRUE)
 
 #### Main function ####
 
-# satellite_median = c(NaN,0.549999987706542,NaN,NaN,0.5999999865889549,1.1099999751895666,NaN,0.9699999783188104,NaN,NaN)
+# satellite_median = c(4,0.549999987706542,3,2,0.5999999865889549,1.1099999751895666,1,0.9699999783188104,3,5)
 # satellite_n = c(0, 1, 0, 0, 1, 1, 0, 1, 0, 0)
 # satellite_sd = c(NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
 # satellite_times = c(NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
+# insitu_variable = c('SPM', 'SPM', 'SPM', 'SPM', 'SPM', 'SPM', 'TURB', 'TURB', 'TURB', 'TURB')
 # insitu_value = c(0.034, 0.331, 0.787, 0.148, 0.297, 0.217, 0.342, 0.342, 0.182, 0.354)
 # insitu_time = c('11:15:00','10:10:00','11:40:00','14:00:00','10:30:00','11:05:00','11:35:00','10:45:00','10:10:00','11:20:00')
 # insitu_Data_source = c('REPHY','REPHY','REPHY','REPHY','REPHY','REPHY','REPHY','REPHY','REPHY','REPHY')
@@ -28,78 +29,85 @@ lapply(list_of_packages, require, character.only = TRUE)
 # satellite_source = 'SEXTANT'
 # satellite_sensor = 'merged'
 # satellite_atm_corr = 'Standard'
-# satellite_algorithm = 'CHL'
+# satellite_algorithm = 'SPM'
 # site_name = c('Marseillan (a)','SÃ¨te mer','Parc Leucate 2','Marseillan (a)','SÃ¨te mer','Barcares','Parc Leucate 2','Barcares','Marseillan (a)','Parc Leucate 2')
 # region_name = c('Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion',
 #                'Bagdad', 'Bagdad', 'Bagdad', 'Bagdad')
+# zones = c('GULF_OF_LION')
 # where_to_save_MU_results <- '/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/'
 
 Save_validation_scatterplots_and_stats <- function(satellite_median, satellite_n, satellite_sd, satellite_times, 
-                          insitu_value, insitu_time, insitu_Data_source, site_name, region_name,
+                                                   insitu_variable, insitu_value, insitu_time, insitu_Data_source, site_name, region_name, zones,
                           min_n, max_CV, max_hour_diff, grid_size, date,
                           satellite_source, satellite_sensor, satellite_atm_corr, satellite_algorithm,
                           where_to_save_MU_results) {
   
   args <- convert_nan(satellite_median, satellite_n, satellite_sd, satellite_times, 
-                      insitu_value, insitu_time, insitu_Data_source, site_name, region_name,
+                      insitu_variable, insitu_value, insitu_time, insitu_Data_source, site_name, region_name, zones,
                       min_n, max_CV, max_hour_diff, grid_size, date,
                       satellite_source, satellite_sensor, satellite_atm_corr, satellite_algorithm,
                       where_to_save_MU_results) %>% 
           setNames(c("satellite_median", "satellite_n", "satellite_sd", "satellite_times", 
-                     "insitu_value", "insitu_time", "insitu_Data_source", "site_name", "region_name",
+                     "insitu_variable", "insitu_value", "insitu_time", "insitu_Data_source", "site_name", "region_name", "zones",
                      "min_n", "max_CV", "max_hour_diff", "grid_size", "date",
                      "satellite_source", "satellite_sensor", "satellite_atm_corr", "satellite_algorithm",
                      "where_to_save_MU_results"))
   
-  plot_title = paste(args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = " / ")
-  plot_subtitle = paste("Grid size = ", args$grid_size, " x ", args$grid_size," / Variation Coefficient ≤ ", args$max_CV, "% / n ≥ ", args$min_n, ' / time difference ≤ ', args$max_hour_diff, "h", sep = "")
-  
-  satellite_CV = 100 * (args$satellite_sd / args$satellite_median)
-  Year = lubridate::year(args$date)
-  Month = lubridate::month(args$date)
-  
-  mask_CV <- case_when(args$max_CV %>% is.finite() ~ satellite_CV <= args$max_CV, .default = TRUE)
-  mask_n <- case_when(args$min_n %>% is.finite() ~ args$satellite_n >= args$min_n, .default = TRUE)
-  mask_hour_diff <- case_when(args$max_hour_diff %>% is.finite() ~ 
-                                abs( as.numeric(hms(args$satellite_times) - hms(args$insitu_time), unit = "hours") ) <= args$max_hour_diff,
-                              .default = TRUE)
-  mask_positive_values <- (args$satellite_median > 0) & (args$insitu_value > 0)
-  
-  final_mask = mask_CV & mask_n & mask_hour_diff & mask_positive_values
-  
-  if (all(final_mask == FALSE)) { return() }
-  
-  regions_to_process <- c('Global', args$region_name[final_mask]) %>% unique()
-  statistics_values <- regions_to_process %>% llply(function(region_name) {
+  unique(args$insitu_variable) %>% l_ply(function(insitu_var) {
     
-    if (region_name == 'Global') {
-      mask <- final_mask
-    } else {
-      mask <- final_mask & (args$region_name == region_name)
-    }
+    plot_title = paste("In-situ", insitu_var, "Vs.", "Satellite",  
+                       paste(args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = " / "))
+    plot_subtitle = paste("Grid size = ", args$grid_size, " x ", args$grid_size," / Variation Coefficient ≤ ", args$max_CV, "% / n ≥ ", args$min_n, ' / time difference ≤ ', args$max_hour_diff, "h", sep = "")
     
-    compute_stats(sat_values = args$satellite_median[mask], insitu_values = args$insitu_value[mask])  
+    satellite_CV = 100 * (args$satellite_sd / args$satellite_median)
+    Year = lubridate::year(args$date)
+    Month = lubridate::month(args$date)
     
-  }, .inform = TRUE) %>% 
-    setNames(regions_to_process)
+    mask_CV <- case_when(args$max_CV %>% is.finite() ~ satellite_CV <= args$max_CV, .default = TRUE)
+    mask_n <- case_when(args$min_n %>% is.finite() ~ args$satellite_n >= args$min_n, .default = TRUE)
+    mask_hour_diff <- case_when(args$max_hour_diff %>% is.finite() ~ 
+                                  abs( as.numeric(hms(args$satellite_times) - hms(args$insitu_time), unit = "hours") ) <= args$max_hour_diff,
+                                .default = TRUE)
+    mask_positive_values <- (args$satellite_median > 0) & (args$insitu_value > 0)
+    mask_insitu_parameter <- insitu_variable == insitu_var
     
-  Figures <- make_the_figures(args$insitu_value[final_mask], args$satellite_median[final_mask], 
-                              Year[final_mask], Month[final_mask],
-                              args$region_name[final_mask],
-                              args$insitu_Data_source[final_mask],
-                              plot_title, plot_subtitle, 
-                              args$satellite_algorithm, 
-                              statistics_values[['Global']])
-  
-  # if (variable %>% str_detect("SST")) { 
-  save_plot_as_png(Figures$scatterplot_with_side_histograms, 
-                   name = paste(args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = "_"), 
-                   path = file.path(args$where_to_save_MU_results, "SCATTERPLOTS", "Per_sat_product"), 
-                   width = 22, height = 16)
-  
-  save_file_as_csv(statistics_values %>% convert_list_to_df() %>% dplyr::select_at(vars(-ends_with("_line"), -contains("_line_"))), 
-                   file.path(args$where_to_save_MU_results, "STATISTICS", "Per_sat_product",
-                             paste(args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = "_")))
+    final_mask = mask_CV & mask_n & mask_hour_diff & mask_positive_values & mask_insitu_parameter
+    
+    if (all(final_mask == FALSE)) { return() }
+    
+    regions_to_process <- c('Global', args$region_name[final_mask]) %>% unique()
+    statistics_values <- regions_to_process %>% llply(function(region_name) {
+      
+      if (region_name == 'Global') {
+        mask <- final_mask
+      } else {
+        mask <- final_mask & (args$region_name == region_name)
+      }
+      
+      compute_stats(sat_values = args$satellite_median[mask], insitu_values = args$insitu_value[mask])  
+      
+    }, .inform = TRUE) %>% 
+      setNames(regions_to_process)
+    
+    Figures <- make_the_figures(args$insitu_value[final_mask], args$satellite_median[final_mask], 
+                                Year[final_mask], Month[final_mask],
+                                args$region_name[final_mask],
+                                args$insitu_Data_source[final_mask],
+                                plot_title, plot_subtitle, 
+                                args$satellite_algorithm, 
+                                statistics_values[['Global']])
+    
+    # if (variable %>% str_detect("SST")) { 
+    save_plot_as_png(Figures$scatterplot_with_side_histograms, 
+                     name = paste("Insitu", insitu_var, "Vs", "Satellite", args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = "_"), 
+                     path = file.path(args$where_to_save_MU_results, paste(args$zones, collapse = "_&_"), "SCATTERPLOTS", "Per_sat_product"), 
+                     width = 22, height = 16)
+    
+    save_file_as_csv(statistics_values %>% convert_list_to_df() %>% dplyr::select_at(vars(-ends_with("_line"), -contains("_line_"))), 
+                     file.path(args$where_to_save_MU_results, paste(args$zones, collapse = "_&_"), "STATISTICS", "Per_sat_product",
+                               paste(args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = "_")))
+    
+  })
   
 }
 
@@ -238,7 +246,7 @@ unit_color_and_axis_limits_for_the_scatterplot <- function(variable) {
     unit <- expression(g~m^-3)
     unit_text = "g m-3"
     axis_limits <- c(10^-2, 10^3)
-    if (variable %in% c("SPM-G", "SPIM")) {
+    if (variable %in% c("SPM-G", "SPIM", 'SPM')) {
       color = "red3"
     } else if (variable == "SPM-R") {
       color = "brown"

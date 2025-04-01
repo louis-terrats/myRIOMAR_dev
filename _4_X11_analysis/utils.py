@@ -398,9 +398,9 @@ def apply_X11_method_and_save_results(values, variable_name, dates, info, where_
     # Adjust layout       
     plt.tight_layout()
 
-    folder_where_to_store_the_plot = os.path.join(where_to_save_X11_results, 'X11_analysis', variable_name) 
+    folder_where_to_store_the_plot = os.path.join(where_to_save_X11_results, info.Zone, 'X11_ANALYSIS', variable_name) 
     os.makedirs(folder_where_to_store_the_plot, exist_ok=True)
-    file_name = "_".join(info.drop(["Year", "Satellite_variable"]).astype(str).values)
+    file_name = "_".join(info.drop(["Zone", "Year", "Satellite_variable"]).astype(str).values)
 
     plt.savefig(folder_where_to_store_the_plot + "/" + file_name + '.png')
     

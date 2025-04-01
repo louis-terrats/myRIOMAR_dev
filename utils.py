@@ -580,3 +580,13 @@ def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False, FRANCE_s
         #     river_ts_binned.index = pd.to_datetime( river_ts_binned['Date'].astype(str) + "-" + "15", format = "%Y-%m-%d" )
             
         # ts_data = river_ts_binned.sort_index()
+        
+        
+def get_the_values_from_a_list_comprehension(lst_comprehension, return_the_unique_values) : 
+    
+    the_values = list(chain(*lst_comprehension))
+    
+    if return_the_unique_values : 
+        the_values = np.unique(the_values)
+    
+    return the_values

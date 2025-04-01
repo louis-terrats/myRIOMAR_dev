@@ -14,6 +14,7 @@ import rpy2.robjects as robjects
 from myRIOMAR_dev._4_X11_analysis.utils import (temporal_decomp_V2_7_x11, apply_X11_method_and_save_results)
 from utils import (get_all_cases_to_process_for_regional_maps_or_plumes_or_X11, path_to_fill_to_where_to_save_satellite_files, 
                    fill_the_sat_paths, load_csv_files_in_the_package_folder)
+from _3_plume_detection.utils import define_parameters
 
 
 ### S'INSPIRER DE LA FONCTION DNAS LE DOSSIER SCRIPTS
@@ -67,10 +68,20 @@ def Apply_X11_method_on_time_series(core_arguments, Zones, nb_of_cores_to_use,
                                                                    info.Data_source : "River_flow"}), 
                                               where_to_save_X11_results = where_to_save_X11_results)
             
+            
+            
             # Source the R script
             robjects.r['source']("myRIOMAR_dev/_4_X11_analysis/utils.R")
 
-            r_function = robjects.r['plot_time_series_of_plume_area_and_thresholds']
-
+            r_function = robjects.r['plot_time_series_of_plume_area_and_river_flow']
         
-        
+            # Call the R function
+            r_function(
+                where_are_saved_X11_results = robjects.StrVector([where_to_save_X11_results]),
+                Zone = robjects.StrVector( [info.Zone] ),
+                Data_source = robjects.StrVector( [info.Data_source] ),
+                sensor_name = robjects.StrVector( [info.sensor_name] ),
+                atmospheric_correction = robjects.StrVector( [info.atmospheric_correction] ),
+                Temporal_resolution = robjects.StrVector( [info.Temporal_resolution] )
+            )
+                    

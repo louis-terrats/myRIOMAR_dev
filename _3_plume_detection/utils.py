@@ -477,7 +477,7 @@ def find_high_value_pixels(data, center_lat, center_lon, radius_km, SPM_threshol
 
 def make_the_plot(path_to_the_figure_file_to_save, ds, ds_reduced, france_shapefile, 
                   lon_range_of_the_map_to_plot, lat_range_of_the_map_to_plot, 
-                  bathymetric_threshold, bathymetry_data_aligned_to_reduced_map, thresholds, 
+                  bathymetric_threshold, bathymetry_data_aligned_to_reduced_map, thresholds,
                   plot_the_plume_area,
                   mask_area = None, close_river_mouth_area = None,
                   pixel_done = None,
@@ -558,9 +558,9 @@ def make_the_plot(path_to_the_figure_file_to_save, ds, ds_reduced, france_shapef
         # Use the mask area to calculate the color bar range
         
         # max_color_bar = np.max( [np.nanquantile(ds.values, 0.99), 1] )
-        max_color_bar = np.max( [np.nanquantile(ds_reduced.values[np.where(mask_area.values)], 0.85), 1] )
+        max_color_bar = np.nanmax( [np.nanquantile(ds_reduced.values[np.where(mask_area.values)], 0.85), 1] )
         # max_color_bar = np.nanquantile(ds.values, 0.99)
-        min_color_bar = np.max( [np.nanmin(ds_reduced.values[np.where(mask_area.values)]), 0.1] )
+        min_color_bar = np.nanmax( [np.nanmin(ds_reduced.values[np.where(mask_area.values)]), 0.1] )
         
     else : 
         # Calculate the color bar range without a mask
@@ -2139,6 +2139,8 @@ def return_stats_dictionnary(final_mask_area, spm_reduced_map, spm_map, paramete
     
     # Identify pixels in the plume area
     plume_area_pixels = np.array(np.where(final_mask_area & np.isfinite(spm_reduced_map)))
+    if plume_area_pixels.size == 0 : 
+        return make_an_empty_dict()
     lat_plume_area_pixels, lon_plume_area_pixels = final_mask_area.lat[plume_area_pixels[0]], final_mask_area.lon[plume_area_pixels[1]]
         
     # Calculate centroids of the plume area

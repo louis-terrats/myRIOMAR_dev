@@ -2,13 +2,14 @@ from utils import (get_all_cases_to_process)
 from _1_data_validation.utils import MU_database_processing
 
 
-def Match_up_with_insitu_measurements(core_arguments, redo_the_MU_database, nb_of_cores_to_use,
+def Match_up_with_insitu_measurements(core_arguments, zones, redo_the_MU_database, nb_of_cores_to_use,
                                       where_are_saved_satellite_data, where_to_save_Match_Up_data) : 
              
     cases_to_process = get_all_cases_to_process(core_arguments)
                
     MU_database = MU_database_processing(where_to_save_Match_Up_data = where_to_save_Match_Up_data, 
                               cases_to_process = cases_to_process,
+                              zones = zones,
                               redo_the_MU_database = redo_the_MU_database,
                               nb_of_cores_to_use = nb_of_cores_to_use)
     
