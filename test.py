@@ -33,10 +33,10 @@ matplotlib.use('agg') # Prevent showing plot in the Plot panel (this saves RAM m
 #                     'end_day' : '2021/01/31'}
 
 core_arguments = {  'Data_sources': ['SEXTANT'], # ODATIS / SEXTANT / EUMETSAT
-                    'Sensor_names':["merged", "modis"], 
+                    'Sensor_names':["merged"], 
                     'Satellite_variables':['SPM'], 
                     'Atmospheric_corrections':["Standard"], # Standard (SEXTANT / EUMETSAT) /  ...
-                    'Temporal_resolution': ["DAILY"], # A enlever ! 
+                    'Temporal_resolution': ["WEEKLY"], # A enlever ! 
                     'start_day' : '1998/01/01',
                     'end_day' : '2024/12/31'}
 
@@ -63,11 +63,12 @@ myRIOMAR._Add_my_zone(name = 'THAY', min_lat = 9, max_lat = X)
 #%% Match-up with SOMLIT and REPHY stations
 
 myRIOMAR._1_data_validation.Match_up_with_insitu_measurements(core_arguments, 
-                                                              zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
-                                                              redo_the_MU_database = True, 
+                                                              # zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
+                                                              zones = ['FRANCE'],
+                                                              redo_the_MU_database = False, 
                                                               nb_of_cores_to_use = 4,
                                                               where_are_saved_satellite_data = "/media/terrats/My Book/LOUIS_TERRATS/RIOMAR/DATA/OCEAN_COLOR/",
-                                                              where_to_save_Match_Up_data = "/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/")
+                                                              where_to_save_Match_Up_data = "/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/MANH")
 
 
 #%% Make regional maps
@@ -90,22 +91,20 @@ myRIOMAR._2_regional_maps.create_regional_maps(core_arguments,
 #%% Detect the plumes
 
 myRIOMAR._3_plume_detection.apply_plume_mask(core_arguments,
-                                             # Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
-                                             Zones = ['GULF_OF_LION'],
-                                             detect_plumes_on_which_temporal_resolution_data = 'DAILY',
+                                             Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
+                                             # Zones = ['BAY_OF_SEINE'],
+                                             detect_plumes_on_which_temporal_resolution_data = 'WEEKLY',
                                              nb_of_cores_to_use = 4,
                                              where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS",
-                                             where_to_save_plume_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS")
+                                             where_to_save_plume_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST")
 
 #%% Plot time-series of plume surface
-
 myRIOMAR._3_plume_detection.make_and_plot_time_series_of_plume_areas(core_arguments,
-                                                     Zones = ['GULF_OF_LION'],
+                                                     Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
                                                      nb_of_cores_to_use = 4,
-                                                     on_which_temporal_resolution_the_plumes_have_been_detected = 'DAILY',
-                                                     where_are_saved_plume_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS",
-                                                     where_to_save_plume_time_series = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS")
-
+                                                     on_which_temporal_resolution_the_plumes_have_been_detected = 'WEEKLY',
+                                                     where_are_saved_plume_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST",
+                                                     where_to_save_plume_time_series = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST")
 
 #%% Do X11 analysis on plume time-series
 
@@ -126,4 +125,7 @@ myRIOMAR._5_Figures_for_article.Figure_1(where_are_saved_satellite_data = "/medi
                                          where_to_save_the_figure = "/home/terrats/Desktop/RIOMAR/TEST/")
 
 myRIOMAR._5_Figures_for_article.Figure_2(where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/",
+                                         where_to_save_the_figure = "/home/terrats/Desktop/RIOMAR/TEST/")
+
+myRIOMAR._5_Figures_for_article.Figure_4(where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/",
                                          where_to_save_the_figure = "/home/terrats/Desktop/RIOMAR/TEST/")

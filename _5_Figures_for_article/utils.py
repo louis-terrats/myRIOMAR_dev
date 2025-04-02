@@ -69,7 +69,7 @@ def load_the_regional_maps_and_save_them_for_plotting(where_are_saved_regional_m
     folder_where_to_save_Figure_2_data = os.path.join(where_to_save_the_figure, 'ARTICLE', 'FIGURES', 'FIGURE_2', 'DATA')
     os.makedirs(folder_where_to_save_Figure_2_data, exist_ok = True)
     
-    path_to_regional_maps = {key : (path_to_fill_to_where_to_save_satellite_files( os.path.join(where_are_saved_regional_maps, 'RESULTS', key) )
+    path_to_regional_maps = {key : (path_to_fill_to_where_to_save_satellite_files( os.path.join(where_are_saved_regional_maps, key) )
                                        .replace('[DATA_SOURCE]/[PARAMETER]/[SENSOR]/[ATMOSPHERIC_CORRECTION]/[TIME_FREQUENCY]',
                                                 'SEXTANT/SPM/merged/Standard/MAPS/DAILY')
                                        .replace('[YEAR]/[MONTH]/[DAY]', f'{date[:4]}/{date}.pkl')) 

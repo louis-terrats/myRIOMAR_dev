@@ -24,7 +24,7 @@ from joblib import dump, load
 #### Functions
 # =============================================================================
     
-def get_insitu_measurements(zones = None) : 
+def get_insitu_measurements(zones) : 
         
     # =============================================================================
     #     SOMLIT
@@ -136,7 +136,7 @@ def get_insitu_measurements(zones = None) :
     
     # INSITU_stations = INSITU_measurements.loc[:,["SOURCE", "SITE", "LATITUDE", "LONGITUDE"]].drop_duplicates().reset_index(drop = True)
 
-    if zones is not None : 
+    if len(zones) > 1 or zones != ["FRANCE"] : 
         
         coordinates_of_the_zones = {zone: define_parameters(zone)['lat_range_of_the_map_to_plot'] + 
                                    define_parameters(zone)['lon_range_of_the_map_to_plot'] 
@@ -294,13 +294,13 @@ def get_the_corresponding_insitu_parameter_name(satellite_variable_name) :
         return ['SPM', 'TURB']
     
     if 'CHL' in satellite_variable_name : 
-        return 'CHLA'
+        return ['CHLA']
     
     if 'RRS' in satellite_variable_name : 
-        return 'CHLA'
+        return ['CHLA']
     
     if 'SST' in satellite_variable_name : 
-        return 'TEMP'
+        return ['TEMP']
 
 def Summarize_the_matchup_database(path, MU_database) : 
     
@@ -419,7 +419,7 @@ def scatterplot_and_save_statistics(MU_summary_df, info, where_are_saved_Match_U
 
 class MU_database_processing : 
     
-    def __init__(self, where_to_save_Match_Up_data, cases_to_process, zones, nb_of_cores_to_use = 1, redo_the_MU_database = False) :
+    def __init__(self, where_to_save_Match_Up_data, cases_to_process, zones = "FRANCE", nb_of_cores_to_use = 1, redo_the_MU_database = False) :
         
         grid_size = 9 # 9x9
         
@@ -627,8 +627,8 @@ class MU_database_processing :
         
         if self.any_modification_has_been_done == False :          
 
-            self.MU_database_df = pd.read_csv(f"{base_path_to_save_data}database.csv")
-            self.MU_summary_df = pd.read_csv(f"{base_path_to_save_data}summary.csv")
+            self.MU_database_df = pd.read_csv(f"{base_path_to_save_data}database.csv", low_memory=False)
+            self.MU_summary_df = pd.read_csv(f"{base_path_to_save_data}summary.csv", low_memory=False)
             return
 
         MU_summary_df = process_data(self.MU_summary)

@@ -120,11 +120,13 @@ def apply_plume_mask(core_arguments, Zones, detect_plumes_on_which_temporal_reso
         
         # Create a DataFrame from the results, sort by date, and save it to a CSV
         statistics = pd.DataFrame([x for x in results if x is not None]).sort_values('date').reset_index(drop = True)
-        statistics.to_csv(f'{os.path.dirname(file_names[0]).replace("MAPS", "PLUME_DETECTION")}/Results.csv', index=False)
+        folder_name = os.path.dirname(file_names[0]).replace(where_are_saved_regional_maps, where_to_save_plume_results).replace("MAPS", "PLUME_DETECTION")
+        os.makedirs(folder_name, exist_ok=True)
+        statistics.to_csv(f'{folder_name}/Results.csv', index=False)
          
         # Create a GIF from the saved maps by combining all PNG images
-        saved_maps = sorted( glob.glob(f'{os.path.dirname(file_names[0]).replace("MAPS", "PLUME_DETECTION")}/MAPS/*.png') )
-        with imageio.get_writer(f'{os.path.dirname(file_names[0]).replace("MAPS", "PLUME_DETECTION")}/GIF.gif', mode='I', fps= 1) as writer:
+        saved_maps = sorted( glob.glob(f'{folder_name}/MAPS/*.png') )
+        with imageio.get_writer(f'{folder_name}/GIF.gif', mode='I', fps= 1) as writer:
             for figure_file in saved_maps :
                 image = imageio.imread(figure_file)
                 writer.append_data(image)

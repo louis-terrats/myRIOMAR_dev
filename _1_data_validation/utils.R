@@ -27,13 +27,13 @@ lapply(list_of_packages, require, character.only = TRUE)
 # grid_size = 1
 # date = c('2018-01-02','2018-01-02','2018-01-08','2018-01-16','2018-01-16','2018-01-15','2018-01-15','2018-01-29','2018-01-29','2018-01-29')
 # satellite_source = 'SEXTANT'
-# satellite_sensor = 'merged'
+# satellite_sensor = 'modis'
 # satellite_atm_corr = 'Standard'
-# satellite_algorithm = 'SPM'
+# satellite_algorithm = 'suspended_matters'
 # site_name = c('Marseillan (a)','SÃ¨te mer','Parc Leucate 2','Marseillan (a)','SÃ¨te mer','Barcares','Parc Leucate 2','Barcares','Marseillan (a)','Parc Leucate 2')
 # region_name = c('Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion',
 #                'Bagdad', 'Bagdad', 'Bagdad', 'Bagdad')
-# zones = c('GULF_OF_LION')
+# zones = c('GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY')
 # where_to_save_MU_results <- '/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/'
 
 Save_validation_scatterplots_and_stats <- function(satellite_median, satellite_n, satellite_sd, satellite_times, 
@@ -72,10 +72,12 @@ Save_validation_scatterplots_and_stats <- function(satellite_median, satellite_n
     mask_insitu_parameter <- insitu_variable == insitu_var
     
     final_mask = mask_CV & mask_n & mask_hour_diff & mask_positive_values & mask_insitu_parameter
+
+    if ( final_mask %>% is.null()) { return() }
+    final_mask_index <- which(final_mask)
     
-    if (all(final_mask == FALSE)) { return() }
+    regions_to_process <- c('Global', args$region_name[final_mask_index]) %>% unique()
     
-    regions_to_process <- c('Global', args$region_name[final_mask]) %>% unique()
     statistics_values <- regions_to_process %>% llply(function(region_name) {
       
       if (region_name == 'Global') {
@@ -84,15 +86,15 @@ Save_validation_scatterplots_and_stats <- function(satellite_median, satellite_n
         mask <- final_mask & (args$region_name == region_name)
       }
       
-      compute_stats(sat_values = args$satellite_median[mask], insitu_values = args$insitu_value[mask])  
+      compute_stats(sat_values = args$satellite_median[which(mask)], insitu_values = args$insitu_value[which(mask)])  
       
     }, .inform = TRUE) %>% 
       setNames(regions_to_process)
     
-    Figures <- make_the_figures(args$insitu_value[final_mask], args$satellite_median[final_mask], 
-                                Year[final_mask], Month[final_mask],
-                                args$region_name[final_mask],
-                                args$insitu_Data_source[final_mask],
+    Figures <- make_the_figures(args$insitu_value[final_mask_index], args$satellite_median[final_mask_index], 
+                                Year[final_mask_index], Month[final_mask_index],
+                                args$region_name[final_mask_index],
+                                args$insitu_Data_source[final_mask_index],
                                 plot_title, plot_subtitle, 
                                 args$satellite_algorithm, 
                                 statistics_values[['Global']])
@@ -107,7 +109,7 @@ Save_validation_scatterplots_and_stats <- function(satellite_median, satellite_n
                      file.path(args$where_to_save_MU_results, paste(args$zones, collapse = "_&_"), "STATISTICS", "Per_sat_product",
                                paste(args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = "_")))
     
-  })
+  }, .inform = TRUE)
   
 }
 
@@ -242,11 +244,11 @@ unit_color_and_axis_limits_for_the_scatterplot <- function(variable) {
     unit_text = "mg m-3"
     color = "green3"
     axis_limits <- c(10^-2, 10^2)
-  } else if ( grepl( 'SPM|SPIM', variable) ) {
+  } else if ( grepl( 'SPM|SPIM|suspended_matters', variable) ) {
     unit <- expression(g~m^-3)
     unit_text = "g m-3"
     axis_limits <- c(10^-2, 10^3)
-    if (variable %in% c("SPM-G", "SPIM", 'SPM')) {
+    if (variable %in% c("SPM-G", "SPIM", 'SPM', 'suspended_matters')) {
       color = "red3"
     } else if (variable == "SPM-R") {
       color = "brown"
@@ -379,10 +381,10 @@ make_the_figures <- function(insitu_value, satellite_median, Year, Month,
     
     annotate(geom = 'text', x = unit_color_and_axis_limits$axis_limits[1], y = unit_color_and_axis_limits$axis_limits[2], 
              hjust = 0, vjust = 1, color = "black", size = 12.5,
-             label = paste('Error = ', round(Error_value, 1), "%\n",
-                           'Bias = ', round(Bias_value, 1), " %\n",
+             label = paste('Error = ', round( ifelse(Error_value %>% is.numeric(),Error_value, NA), 1), "%\n",
+                           'Bias = ', round(ifelse(Bias_value %>% is.numeric(),Bias_value, NA), 1), " %\n",
                            # 'r² (linearity) = ', round(statistics_values$r2_log, 2),"\n",
-                           'Slope = ', round(Slope_value, 2),"\n",
+                           'Slope = ', round(ifelse(Slope_value %>% is.numeric(),Slope_value, NA), 2),"\n",
                            'n = ', nrow(MU_data), sep = "")) + 
     
     labs(title = plot_title, subtitle = plot_subtitle, shape = "") +

@@ -5,17 +5,17 @@ lapply(list_of_packages, require, character.only = TRUE)
 
 #### Main ####
 
-# where_are_saved_plume_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS'
-# where_to_save_plume_time_series = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS'
-# Zone = c('GULF_OF_LION')
+# where_are_saved_plume_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST'
+# where_to_save_plume_time_series = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST'
+# Zone = c('GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY')
 # Data_source = 'SEXTANT'
 # Satellite_sensor = c('merged')
 # atmospheric_correction = 'Standard'
-# Temporal_resolution = 'DAILY'
+# Temporal_resolution = 'MONTHLY'
 # Years = 1998:2024
-# # Plumes = list('BAY_OF_BISCAY' = list('Gironde', 'Charente', 'Sevre'), 'SOUTHERN_BRITTANY' = list('Loire', 'Vilaine'),
-# #               'GULF_OF_LION' = list('Grand Rhone', 'Petit Rhone'), 'BAY_OF_SEINE' = list('Seine'))
-# Plumes = list('GULF_OF_LION' = list('Grand Rhone', 'Petit Rhone'))
+# Plumes = list('BAY_OF_BISCAY' = list('Gironde', 'Charente', 'Sevre'), 'SOUTHERN_BRITTANY' = list('Loire', 'Vilaine'),
+#               'GULF_OF_LION' = list('Grand Rhone', 'Petit Rhone'), 'BAY_OF_SEINE' = list('Seine'))
+# # Plumes = list('BAY_OF_SEINE' = list('Seine'))
 # nb_of_cores_to_use = 6
 
 plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_results, where_to_save_plume_time_series, 
@@ -75,6 +75,7 @@ plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_
       ts_data_of_the_case <- ts_data %>%
         filter(Zone == row$Zone, Temporal_resolution == row$Temporal_resolution) %>%
         select(-matches( paste0("SPM_threshold_", setdiff(Plumes %>% unlist() %>% str_replace(" ", ".") %>% append(" "), plume_names) ) )) %>% 
+        select_if(~sum(!is.na(.)) > 0) %>% 
         filter_at(vars(starts_with('SPM_threshold')), ~ is.finite(.)) %>% 
         mutate(path_to_file = file_path %>% 
                  str_replace(as.character(where_are_saved_plume_results), where_to_save_plume_time_series) %>% 
@@ -114,6 +115,12 @@ plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_
 }
 
 
+
+plot_the_SPM_and_plume_maps <- function() {
+  
+  
+  
+}
 
 
 #### Utils ####

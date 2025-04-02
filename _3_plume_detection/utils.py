@@ -15,6 +15,8 @@ from shapely.geometry import Polygon
 from shapely.vectorized import contains
 from skimage import morphology
 from functools import reduce
+import rpy2.robjects as robjects
+
 
 from utils import (load_file)
 
@@ -1247,7 +1249,7 @@ def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, m
 
     # Compute the SPM threshold as the 10th percentile of filtered values
     # SPM_threshold = np.nanmin( filtered_values )
-    SPM_threshold = np.max( [np.nanquantile(filtered_values, 0.25), minimal_threshold] ) # 0.1 # 0.25
+    SPM_threshold = np.max( [np.nanquantile(filtered_values, 0.1), minimal_threshold] ) # 0.25
     
     return SPM_threshold
 
@@ -1657,9 +1659,9 @@ def define_parameters(Zone) :
         lon_range_to_search_plume_area = [-1.5, 0.5]
         maximal_bathymetric_for_zone_with_resuspension = {'Seine' : 30}
         minimal_distance_from_estuary_for_zone_with_resuspension = {'Seine' : 30}
-        max_steps_for_the_directions = {'Seine' : 50}
-        maximal_threshold = 20 # 15
-        minimal_threshold = 8
+        max_steps_for_the_directions = {'Seine' : 40}
+        maximal_threshold = 7 # 15
+        minimal_threshold = 4 # 4
         river_mouth_to_exclude = {'Canal de Caen à la mer' : [49.296, -0.245]}
         
         
@@ -1707,8 +1709,8 @@ def define_parameters(Zone) :
         maximal_bathymetric_for_zone_with_resuspension = {'Gironde' : 20, 'Charente' : 20, 'Sevre' : 20}
         minimal_distance_from_estuary_for_zone_with_resuspension = {'Gironde' : 30, 'Charente' : 20, 'Sevre' : 20}
         max_steps_for_the_directions = {'Gironde' : 100, 'Charente' : 50, 'Sevre' : 50}
-        maximal_threshold = 12
-        minimal_threshold = 4
+        maximal_threshold = 10 # 12
+        minimal_threshold = 3 # 4
         river_mouth_to_exclude = {}
     
     if Zone == "GULF_OF_LION" :   
@@ -1745,8 +1747,8 @@ def define_parameters(Zone) :
         maximal_bathymetric_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
         minimal_distance_from_estuary_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
         max_steps_for_the_directions = {'Grand Rhone' : 35, 'Petit Rhone' : 35}
-        maximal_threshold = 3
-        minimal_threshold = 0.75
+        maximal_threshold = 4 # 3
+        minimal_threshold = 1 # 0.75
         river_mouth_to_exclude = {}
         
     if Zone == 'EASTERN_CHANNEL' :
@@ -1853,8 +1855,8 @@ def define_parameters(Zone) :
         maximal_bathymetric_for_zone_with_resuspension = {'Loire' : 20, 'Vilaine' : 20}
         minimal_distance_from_estuary_for_zone_with_resuspension = {'Loire' : 20, 'Vilaine' : 20}
         max_steps_for_the_directions = { 'Loire' : 100, 'Vilaine' : 50}
-        maximal_threshold = 12
-        minimal_threshold = 3
+        maximal_threshold = 10 # 12
+        minimal_threshold = 3 # 3
         river_mouth_to_exclude = {}
     
     searching_strategy_directions = coordinates_of_pixels_to_inspect( searching_strategies )
@@ -2315,7 +2317,7 @@ def Check_if_the_area_is_too_cloudy(dataset, map_wo_clouds, parameters) :
     return test
 
 
-def fast_delimitation_of_a_river_plume_area(   spm_map, land_mask, start_point, SPM_threshold, minimal_threshold, max_steps = 20) : 
+def fast_delimitation_of_a_river_plume_area(   spm_map, land_mask, start_point, SPM_threshold, maximal_threshold, max_steps = 20) : 
     
     """
     Delimits a river plume area based on a Suspended Particulate Matter (SPM) map 
@@ -2373,7 +2375,7 @@ def fast_delimitation_of_a_river_plume_area(   spm_map, land_mask, start_point, 
                                                                                    start_point = start_point, 
                                                                                    directions = directions['directions'],
                                                                                    max_steps = max_steps, # Max steps for gradient expansion
-                                                                                   lower_high_values_to = np.min( [SPM_threshold*5, minimal_threshold] ),
+                                                                                   lower_high_values_to = np.min( [SPM_threshold*5, maximal_threshold] ),
                                                                                    create_X_intermediates_between_each_direction = 2) # Number of intermediate directions
 
     if gradient_values is None : 
@@ -2948,12 +2950,19 @@ class Create_the_plume_mask :
         # Loop through each provided river mouth position
         for i, position_of_a_river_mouth in positions_of_river_mouths.items() :  
             
+            # spm_map = self.spm_map
+            # land_mask = self.land_mask
+            # start_point = position_of_a_river_mouth
+            # SPM_threshold = self.SPM_threshold
+            # minimal_threshold = self.parameters['minimal_threshold']
+            # max_steps = 20
+            
             # Delimit the plume area for the current river mouth
             delimitation_of_the_plume =  fast_delimitation_of_a_river_plume_area(spm_map = self.spm_map, 
                                                                                 land_mask = self.land_mask,
                                                                                 start_point = position_of_a_river_mouth,
                                                                                 SPM_threshold = self.SPM_threshold,
-                                                                                minimal_threshold = self.parameters['minimal_threshold'],
+                                                                                maximal_threshold = self.parameters['maximal_threshold'],
                                                                                 max_steps = 20)
             
             if delimitation_of_the_plume is None : 
@@ -2982,3 +2991,30 @@ class Create_the_plume_mask :
         self.protocol.append(f'{len(self.protocol)} : remove_the_river_plume_from_the_mouth_of_the_neighboring_river')
 
 
+    def do_R_plot(self, where_to_save_the_plot, name_of_the_plot):
+        """
+        Convert the SPM map and plume mask to an R dataframe and plot using ggplot2.
+        """
+        
+        # Create a Pandas DataFrame
+        lat_values = self.spm_map.lat.values
+        lon_values = self.spm_map.lon.values
+        
+        df = pd.DataFrame({
+            'longitude': np.tile(lat_values, len(lon_values)),
+            'latitude': np.repeat(lon_values, len(lat_values)),
+            'spm': self.spm_map.values.flatten()
+        })
+        
+        if 'plume_mask' in vars(self) :
+            df['plume'] = self.plume_mask.flatten().astype(int)
+        
+        # Source the R script
+        robjects.r['source']("myRIOMAR_dev/_3_plume_detection/utils.R")
+
+        r_function = robjects.r['plot_the_SPM_and_plume_maps']
+
+        # Call the R function
+        r_function(
+            
+        )
