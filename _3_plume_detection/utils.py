@@ -10,7 +10,6 @@ from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 from collections import deque
 from scipy.spatial.distance import cdist
-from concave_hull import concave_hull
 from shapely.geometry import Polygon
 from shapely.vectorized import contains
 from skimage import morphology
@@ -18,7 +17,7 @@ from functools import reduce
 import rpy2.robjects as robjects
 
 
-from utils import (load_file)
+from utils import (load_file, coordinates_of_pixels_to_inspect)
 
 # =============================================================================
 #### Functions
@@ -33,7 +32,8 @@ def main_process(file_name, file_names_pattern,
             map_wo_clouds, land_mask,
             inside_polygon_mask,
             where_to_save_plume_results,
-            where_are_saved_regional_maps) : 
+            where_are_saved_regional_maps,
+            use_dynamic_threshold) : 
 
     """
     Process a single satellite data file for plume detection.
@@ -115,7 +115,8 @@ def main_process(file_name, file_names_pattern,
                                            land_mask,
                                            parameters,
                                            plume_name,
-                                           inside_polygon_mask)
+                                           inside_polygon_mask,
+                                           use_dynamic_threshold)
         
         if the_plume is None : 
             continue
@@ -793,82 +794,6 @@ def merge_plume_shape_with_close_shapes(mask_area, core_of_the_plume, land_mask,
     return mask_area
 
 
-def coordinates_of_pixels_to_inspect(searching_strategies) : 
-     
-    """
-   Computes the relative distances from a center pixel to all "True" pixels 
-   in a given grid for each search strategy.
-
-   Parameters
-   ----------
-   searching_strategies : dict
-       A dictionary where each key corresponds to a search strategy. Each value 
-       is another dictionary with:
-           - 'grid' : 2D boolean numpy array
-               A boolean grid where "True" indicates pixels of interest.
-           - 'coordinates_of_center' : tuple of int
-               Coordinates (row, column) of the center pixel in the grid.
-
-   Returns
-   -------
-   to_return : dict
-       A dictionary where each key corresponds to a search strategy and each value 
-       is a list of tuples representing the relative distances of "True" pixels 
-       from the center pixel.
-   """
-
-    to_return = {} # Initialize an empty dictionary to store results
-       
-    # Iterate through each search strategy in the input dictionary
-    for index, searching_strategy in searching_strategies.items() : 
-    
-        # Initialize a list to store the distances (as tuples) for this strategy
-        distance_list = []
-        
-        # Extract the boolean grid (a 2D array) and center pixel coordinates
-        boolean_array = searching_strategy['grid']
-        coordinate_of_the_center = searching_strategy['coordinates_of_center']
-        
-        # Loop through each pixel in the grid
-        for i in range(boolean_array.shape[0]): # Iterate over rows
-        
-            for j in range(boolean_array.shape[1]):  # Iterate over columns
-            
-                # Check if the pixel is "True"
-                if boolean_array[i, j]:
-                    
-                    # Calculate the horizontal distance (x-axis) from the center
-                    distance_x = coordinate_of_the_center[0] - i
-                    
-                    # Calculate the vertical distance (y-axis) and invert sign for standard image coordinates
-                    # We multiply by -1 to account for typical image coordinate systems where y-coordinates increase downwards
-                    distance_y = (coordinate_of_the_center[1] - j) * -1
-                    
-                    # Append the distance (as a tuple) to the list
-                    distance_list.append((distance_x, distance_y))
-             
-        # Exclude the center pixel itself (distance of (0, 0))
-        distance_list = concave_hull( [x for x in distance_list if x != (0,0)] )
-        
-        # Ensure that distances are ordered sequentially (no large jumps)
-        distance_list_in_good_order = abs( np.array( np.diff( [ np.sum(x) for x in distance_list ] ) ) ) <= 1
-        
-        # If distances are not in a good order, reorder them
-        if any( distance_list_in_good_order == False ) : 
-            index_start_element = np.where( distance_list_in_good_order == False )[0] +1
-            distance_list = [distance_list[ index_start_element[0] ], 
-                             distance_list[ index_start_element[0]: ],
-                             distance_list[ :index_start_element[0] ]]
-            distance_list = flatten_a_list(distance_list)  # Flatten the reordered list
-            distance_list = list(dict.fromkeys(distance_list))  # Remove duplicates while preserving order
-        
-        # Store the computed list of distances in the dictionary
-        to_return[f'{index}'] = distance_list
-           
-    # Return the dictionary containing the distances for all search strategies
-    return to_return
-
-
 def Set_cloudy_regions_to_True(ds_reduced, mask_area, land_mask, SPM_threshold) :
             
     """
@@ -1177,7 +1102,7 @@ def filter_gradient_points_vectorized(gradient_values, gradient_points, absolute
 
 
 
-def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, maximal_threshold, minimal_threshold) : 
+def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, maximal_threshold, minimal_threshold, quantile_to_use) : 
 
     """
     Finds the Suspended Particulate Matter (SPM) threshold by analyzing gradients 
@@ -1249,9 +1174,9 @@ def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, m
 
     # Compute the SPM threshold as the 10th percentile of filtered values
     # SPM_threshold = np.nanmin( filtered_values )
-    SPM_threshold = np.max( [np.nanquantile(filtered_values, 0.1), minimal_threshold] ) # 0.25
+    SPM_threshold = np.max( [np.nanquantile(filtered_values, quantile_to_use), minimal_threshold] ) # 0.25
     
-    return SPM_threshold
+    return SPM_threshold, filtered_points
 
 
 def find_first_nan_after_finite(arr):
@@ -1560,30 +1485,6 @@ def set_mask_area_values_to_False_based_on_an_index_object(mask_area, index_obje
             
     return mask_area
 
-def flatten_a_list(lst):
-    
-    """
-    Flatten a nested list into a single list.
-
-    Parameters
-    ----------
-    lst : list
-        A potentially nested list of elements.
-
-    Returns
-    -------
-    list
-        A flattened list containing all elements from the nested list.
-    """
-    
-    flat_list = []
-    for item in lst:
-        if isinstance(item, list):
-            flat_list.extend(flatten_a_list(item))  # Recursive call for nested lists
-        else:
-            flat_list.append(item)
-    return flat_list
-
 
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -1619,268 +1520,6 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     
     return EARTH_RADIUS * c
-
-def define_parameters(Zone) : 
-    
-    """
-    Define region-specific parameters based on the selected zone.
-
-    Parameters
-    ----------
-    Zone : str
-        Name of the geographic zone (e.g., "BAY_OF_SEINE", "BAY_OF_BISCAY").
-
-    Returns
-    -------
-    dict
-        A dictionary containing the parameters for the specified zone.
-    """
-        
-    if Zone == "BAY_OF_SEINE" :
-        
-        lon_new_resolution = 0.015
-        lat_new_resolution = 0.015
-        searching_strategies = {'Seine' : {'grid' : np.array([    [False, False, False, False, False],
-                                                                  [False, True,  True,  True,  False],
-                                                                  [False, True,  True,  False,  False],
-                                                                  [False, True,  True,  False,  False],
-                                                                  [False, False, False, False, False],
-                                                                ]),
-                                      'coordinates_of_center' : (2,2)}}
-        bathymetric_threshold = 0
-        starting_points = {'Seine' : (49.43, 0.145)}
-        core_of_the_plumes = {'Seine' : (49.43, 0)}
-        lat_range_of_the_area_to_check_for_clouds = [49.25, 49.75]
-        lon_range_of_the_area_to_check_for_clouds = [-0.3, 0.3]
-        threshold_of_cloud_coverage_in_percentage = 25
-        lat_range_of_the_map_to_plot = [49.20, 51.25]
-        lon_range_of_the_map_to_plot = [-1.5, 2.5]
-        lat_range_to_search_plume_area = [49.25, 50.25]
-        lon_range_to_search_plume_area = [-1.5, 0.5]
-        maximal_bathymetric_for_zone_with_resuspension = {'Seine' : 30}
-        minimal_distance_from_estuary_for_zone_with_resuspension = {'Seine' : 30}
-        max_steps_for_the_directions = {'Seine' : 40}
-        maximal_threshold = 7 # 15
-        minimal_threshold = 4 # 4
-        river_mouth_to_exclude = {'Canal de Caen à la mer' : [49.296, -0.245]}
-        
-        
-    if Zone == "BAY_OF_BISCAY" :
-        
-        lon_new_resolution = 0.015
-        lat_new_resolution = 0.015
-        searching_strategies = {'Gironde' : {'grid' : np.array([  [False, False, False, False, False],
-                                                                  [False, True,  True, True, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, True,  False,  False, False],
-                                                                  [False, False, False, False, False],
-                                                                ]),
-                                      'coordinates_of_center' : (2,2)},
-                              
-                                  'Charente' : {'grid' : np.array([ [False, False, False, False, False],
-                                                                    [False, True,  True, False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, False, False, False, False],
-                                                                  ]),
-                                                                'coordinates_of_center' : (2,2)},
-                                  'Sevre' : {'grid' : np.array([  [False, False, False, False, False],
-                                                                  [False, True,  True, False, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, False, False, False, False],
-                                                                ]),
-                                                                'coordinates_of_center' : (2,2)}}
-        bathymetric_threshold = 0
-        starting_points = {'Gironde' : (45.59, -1.05),
-                          'Charente' : (45.96, -1.01),
-                          'Sevre' : (46.30, -1.13)}
-        core_of_the_plumes = {'Gironde' : (45.59, -1.05),
-                              # 'Gironde' : (45.65, -1.33),
-                              'Charente' : (45.98, -1.17),
-                              'Sevre' : (46.24, -1.24)}
-        lat_range_of_the_area_to_check_for_clouds = [45.5, 46.35]
-        lon_range_of_the_area_to_check_for_clouds = [-1.8, -1.2]
-        threshold_of_cloud_coverage_in_percentage = 25
-        lat_range_of_the_map_to_plot = [44.75, 46.75]
-        lon_range_of_the_map_to_plot = [-4.5, -1]
-        lat_range_to_search_plume_area = [45, 46.5]
-        lon_range_to_search_plume_area = [-180, 180]
-        maximal_bathymetric_for_zone_with_resuspension = {'Gironde' : 20, 'Charente' : 20, 'Sevre' : 20}
-        minimal_distance_from_estuary_for_zone_with_resuspension = {'Gironde' : 30, 'Charente' : 20, 'Sevre' : 20}
-        max_steps_for_the_directions = {'Gironde' : 100, 'Charente' : 50, 'Sevre' : 50}
-        maximal_threshold = 10 # 12
-        minimal_threshold = 3 # 4
-        river_mouth_to_exclude = {}
-    
-    if Zone == "GULF_OF_LION" :   
-        
-        lon_new_resolution = 0.015
-        lat_new_resolution = 0.015
-        searching_strategies = {'Grand Rhone' : {'grid' : np.array([  [False, False, False, False, False, False, False],
-                                                                      [False, False, False, False, False, False, False],
-                                                                      [False, False, False,  True, False, False, False],
-                                                                      [True,  True,  True,  True,  True, True, True],
-                                                                      [False, False, False, False, False, False, False],
-                                                                    ]),
-                                      'coordinates_of_center' : (2,3)},
-                                
-                                'Petit Rhone' : {'grid' : np.array([    [False, False, False, False, False],
-                                                                        [False, False, False, False, False],
-                                                                        [False, False, True,  False, False],
-                                                                        [True,  True,  True,  True,  True],
-                                                                        [False, False, False, False, False],
-                                                                      ]),
-                                            'coordinates_of_center' : (2,2)}}
-        bathymetric_threshold = 25
-        starting_points = {'Grand Rhone' : (43.41, 4.83),
-                           'Petit Rhone' : (43.47, 4.39)}
-        core_of_the_plumes = {'Grand Rhone' : (43.32, 4.85),
-                              'Petit Rhone' : (43.43, 4.39)}
-        lat_range_of_the_area_to_check_for_clouds = [43, 43.4]
-        lon_range_of_the_area_to_check_for_clouds = [4.5, 5]
-        threshold_of_cloud_coverage_in_percentage = 25
-        lat_range_of_the_map_to_plot = [42, 43.7]
-        lon_range_of_the_map_to_plot = [2.75, 6.55]
-        lat_range_to_search_plume_area = [-90, 90]
-        lon_range_to_search_plume_area = [-180, 180]
-        maximal_bathymetric_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
-        minimal_distance_from_estuary_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
-        max_steps_for_the_directions = {'Grand Rhone' : 35, 'Petit Rhone' : 35}
-        maximal_threshold = 4 # 3
-        minimal_threshold = 1 # 0.75
-        river_mouth_to_exclude = {}
-        
-    if Zone == 'EASTERN_CHANNEL' :
-        
-        lon_new_resolution = 0.015
-        lat_new_resolution = 0.015
-        searching_strategies = {'Arques' : {'grid' : np.array([   [False, False, False, False, False],
-                                                                  [False, True,  True,  True, False],
-                                                                  [False, True,  True,  True, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, False, False, False, False],
-                                                                ]),
-                                      'coordinates_of_center' : (2,2)},
-                                'Bresle' : {'grid' : np.array([   [False, False, False, False, False],
-                                                                  [False, True,  True,  True, False],
-                                                                  [False, True,  True,  True, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, False, False, False, False],
-                                                                ]),
-                                      'coordinates_of_center' : (2,2)},
-                                'Somme' : {'grid' : np.array([    [False, False, False, False, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, False, False, False, False],
-                                                                ]),
-                                      'coordinates_of_center' : (2,2)},
-                                'Authie' : {'grid' : np.array([     [False, False, False, False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, False, False, False, False],
-                                                                  ]),
-                                                              'coordinates_of_center' : (2,2)},
-                                'Canche' : {'grid' : np.array([     [False, False, False, False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, False, False, False, False],
-                                                                  ]),
-                                                              'coordinates_of_center' : (2,2)},
-                                'Liane' : {'grid' : np.array([      [False, False, False, False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, False, False, False, False],
-                                                                  ]),
-                                                              'coordinates_of_center' : (2,2)}}
-          
-        bathymetric_threshold = 0
-        starting_points = { 'Arques' : (49.94, 1.08),
-                            'Bresle' : (50.06, 1.37),
-                            'Somme' : (50.23, 1.58),
-                            'Authie' : (50.37, 1.58),
-                            'Canche' : (50.55, 1.60),
-                            'Liane' : (50.73, 1.59)}
-        core_of_the_plumes = {'Arques' : (49.95, 1.07),
-                              'Bresle' : (50.08, 1.37),
-                              'Somme' : (50.25, 1.45),
-                              'Authie' : (50.38, 1.52),
-                              'Canche' : (50.56, 1.54),
-                              'Liane' : (50.75, 1.56)}
-        lat_range_of_the_area_to_check_for_clouds = [49.75, 50.85]
-        lon_range_of_the_area_to_check_for_clouds = [0.75, 1.75]
-        threshold_of_cloud_coverage_in_percentage = 25
-        lat_range_of_the_map_to_plot = [49.20, 51.5]
-        lon_range_of_the_map_to_plot = [-1.5, 3]
-        lat_range_to_search_plume_area = [49.75, 49.75, 51.15, 50.4]
-        lon_range_to_search_plume_area = [0.5, 1.75, 1.75, 0.5]
-        max_steps_for_the_directions = { 'Arques' : None, 'Bresle' : None, 'Somme' : None,
-                                        'Authie' : None, 'Canche' : None, 'Liane' : None}
-        river_mouth_to_exclude = {}
-      
-    if Zone == 'SOUTHERN_BRITTANY': 
-         
-        lon_new_resolution = 0.015
-        lat_new_resolution = 0.015
-        searching_strategies = {'Loire' : {'grid' : np.array([    [False, False, False, False, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, True,  True,  False, False],
-                                                                  [False, True,  True,  True, False],
-                                                                  [False, False, False, False, False],
-                                                                ]),
-                                      'coordinates_of_center' : (2,2)},
-                                'Vilaine' : {'grid' : np.array([    [False, False, False, False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, True,  True,  False, False],
-                                                                    [False, False, False, False, False],
-                                                                  ]),
-                                                              'coordinates_of_center' : (2,2)}}
-        bathymetric_threshold = 0
-        starting_points = {'Loire' : (47.29, -2.10),
-                            'Vilaine' : (47.50, -2.46)}
-        core_of_the_plumes = {'Loire' : (47.19, -2.36),
-                              'Vilaine' : (47.47, -2.59)}
-        lat_range_of_the_area_to_check_for_clouds = [46.87, 47.55]
-        lon_range_of_the_area_to_check_for_clouds = [-3, -2.01]
-        threshold_of_cloud_coverage_in_percentage = 25
-        lat_range_of_the_map_to_plot = [46, 48.5]
-        lon_range_of_the_map_to_plot = [-5, -1.5]
-        lat_range_to_search_plume_area = [46.5, 47.9]
-        lon_range_to_search_plume_area = [-180, 180]
-        maximal_bathymetric_for_zone_with_resuspension = {'Loire' : 20, 'Vilaine' : 20}
-        minimal_distance_from_estuary_for_zone_with_resuspension = {'Loire' : 20, 'Vilaine' : 20}
-        max_steps_for_the_directions = { 'Loire' : 100, 'Vilaine' : 50}
-        maximal_threshold = 10 # 12
-        minimal_threshold = 3 # 3
-        river_mouth_to_exclude = {}
-    
-    searching_strategy_directions = coordinates_of_pixels_to_inspect( searching_strategies )
-    
-    return {'lon_new_resolution' : lon_new_resolution, 
-            'lat_new_resolution' : lat_new_resolution, 
-            'searching_strategies' : searching_strategies, 
-            'bathymetric_threshold' : bathymetric_threshold, 
-            'starting_points' : starting_points, 
-            'core_of_the_plumes' : core_of_the_plumes,
-            'lat_range_of_the_area_to_check_for_clouds' : lat_range_of_the_area_to_check_for_clouds, 
-            'lon_range_of_the_area_to_check_for_clouds' : lon_range_of_the_area_to_check_for_clouds, 
-            'threshold_of_cloud_coverage_in_percentage' : threshold_of_cloud_coverage_in_percentage,
-            'lat_range_of_the_map_to_plot' : lat_range_of_the_map_to_plot, 
-            'lon_range_of_the_map_to_plot' : lon_range_of_the_map_to_plot, 
-            'lat_range_to_search_plume_area' : lat_range_to_search_plume_area, 
-            'lon_range_to_search_plume_area' : lon_range_to_search_plume_area,
-            'maximal_bathymetric_for_zone_with_resuspension' : maximal_bathymetric_for_zone_with_resuspension,
-            'minimal_distance_from_estuary_for_zone_with_resuspension' : minimal_distance_from_estuary_for_zone_with_resuspension,
-            'max_steps_for_the_directions' : max_steps_for_the_directions,
-            'maximal_threshold' : maximal_threshold,
-            'minimal_threshold' : minimal_threshold,
-            'river_mouth_to_exclude' : river_mouth_to_exclude,
-            'searching_strategy_directions' : searching_strategy_directions}
         
 
 def remove_coastal_areas_with_sediment_resuspension(ds_reduced, mask_area, land_mask, bathymetry_data_aligned_to_reduced_map,
@@ -2454,7 +2093,8 @@ def Pipeline_to_delineate_the_plume(ds_reduced,
                                    land_mask,
                                    parameters,
                                    plume_name,
-                                   inside_polygon_mask) :
+                                   inside_polygon_mask,
+                                   use_dynamic_threshold) :
 
     the_plume = Create_the_plume_mask(ds_reduced, 
                                        bathymetry_data_aligned_to_reduced_map,
@@ -2462,7 +2102,7 @@ def Pipeline_to_delineate_the_plume(ds_reduced,
                                        parameters,
                                        plume_name)
             
-    the_plume.determine_SPM_threshold()
+    the_plume.determine_SPM_threshold(use_dynamic_threshold)
     # the_plume.SPM_threshold = 10
     
     the_plume.do_a_raw_plume_detection()
@@ -2586,7 +2226,7 @@ class Create_the_plume_mask :
         
         
         
-    def determine_SPM_threshold(self, manual_determination_of_SPM_threshold = None) : 
+    def determine_SPM_threshold(self, dynamic_determination_of_SPM_threshold) : 
         
         """
         Determine the SPM threshold for plume detection.
@@ -2602,19 +2242,22 @@ class Create_the_plume_mask :
         # start_point = self.parameters['pixel_starting_points'][self.plume_name]
         # directions = self.parameters['searching_strategy_directions'][self.plume_name]
         # max_steps = self.parameters['max_steps_for_the_directions'][self.plume_name]
-        # maximal_threshold = self.parameters['maximal_threshold']
-        # minimal_threshold = self.parameters['minimal_threshold']
+        # maximal_threshold = self.parameters['maximal_threshold'][self.plume_name]
+        # minimal_threshold = self.parameters['minimal_threshold'][self.plume_name]
+        # quantile_to_use = self.parameters['quantile_to_use'][self.plume_name]
         
-        if manual_determination_of_SPM_threshold is None : 
-            SPM_threshold = find_SPM_threshold(spm_map = self.spm_map, 
+        if dynamic_determination_of_SPM_threshold : 
+            SPM_threshold, points_used_for_finding_SPM_threshold = find_SPM_threshold(spm_map = self.spm_map, 
                                                 land_mask = self.land_mask,
                                                 start_point = self.parameters['pixel_starting_points'][self.plume_name], 
                                                 directions = self.parameters['searching_strategy_directions'][self.plume_name],
                                                 max_steps = self.parameters['max_steps_for_the_directions'][self.plume_name],
-                                                maximal_threshold = self.parameters['maximal_threshold'],
-                                                minimal_threshold = self.parameters['minimal_threshold'])
+                                                maximal_threshold = self.parameters['maximal_threshold'][self.plume_name],
+                                                minimal_threshold = self.parameters['minimal_threshold'][self.plume_name],
+                                                quantile_to_use = self.parameters['quantile_to_use'][self.plume_name])
+            self.points_used_for_finding_SPM_threshold = points_used_for_finding_SPM_threshold
         else : 
-            SPM_threshold = manual_determination_of_SPM_threshold
+            SPM_threshold = self.parameters['fixed_threshold'][self.plume_name]
                 
         self.SPM_threshold = SPM_threshold
         self.protocol.append(f'{len(self.protocol)} : determine_SPM_threshold')
@@ -2954,7 +2597,7 @@ class Create_the_plume_mask :
             # land_mask = self.land_mask
             # start_point = position_of_a_river_mouth
             # SPM_threshold = self.SPM_threshold
-            # minimal_threshold = self.parameters['minimal_threshold']
+            # maximal_threshold = self.parameters['maximal_threshold'][self.plume_name]
             # max_steps = 20
             
             # Delimit the plume area for the current river mouth
@@ -2962,7 +2605,7 @@ class Create_the_plume_mask :
                                                                                 land_mask = self.land_mask,
                                                                                 start_point = position_of_a_river_mouth,
                                                                                 SPM_threshold = self.SPM_threshold,
-                                                                                maximal_threshold = self.parameters['maximal_threshold'],
+                                                                                maximal_threshold = self.parameters['maximal_threshold'][self.plume_name],
                                                                                 max_steps = 20)
             
             if delimitation_of_the_plume is None : 
@@ -2995,26 +2638,39 @@ class Create_the_plume_mask :
         """
         Convert the SPM map and plume mask to an R dataframe and plot using ggplot2.
         """
-        
+          
+        folder_where_to_save_data = os.path.join(where_to_save_the_plot, 'DATA')
+        os.makedirs( folder_where_to_save_data, exist_ok=True )
+          
         # Create a Pandas DataFrame
         lat_values = self.spm_map.lat.values
         lon_values = self.spm_map.lon.values
         
         df = pd.DataFrame({
-            'longitude': np.tile(lat_values, len(lon_values)),
-            'latitude': np.repeat(lon_values, len(lat_values)),
-            'spm': self.spm_map.values.flatten()
+            'lat': np.repeat(lat_values, len(lon_values)),
+            'lon': np.tile(lon_values, len(lat_values)),
+            'analysed_spim': self.spm_map.values.flatten()
         })
         
+        if name_of_the_plot == 'B' :
+            latitudes_used_for_finding_SPM_threshold = lat_values[self.points_used_for_finding_SPM_threshold[:,1].astype(int)]
+            longitudes_used_for_finding_SPM_threshold = lon_values[self.points_used_for_finding_SPM_threshold[:,0].astype(int)]
+            points_used_for_finding_SPM_threshold = pd.DataFrame({'longitude': longitudes_used_for_finding_SPM_threshold, 
+                                                                  'latitude': latitudes_used_for_finding_SPM_threshold})
+            points_used_for_finding_SPM_threshold.to_csv( os.path.join(folder_where_to_save_data, f"{name_of_the_plot}_points_used_for_finding_SPM_threshold.csv") )
+        
         if 'plume_mask' in vars(self) :
-            df['plume'] = self.plume_mask.flatten().astype(int)
+            df['plume'] = self.plume_mask.values.flatten()
+        
+        df.to_csv( os.path.join(folder_where_to_save_data, f"{name_of_the_plot}.csv") )
         
         # Source the R script
-        robjects.r['source']("myRIOMAR_dev/_3_plume_detection/utils.R")
+        robjects.r['source']("myRIOMAR_dev/_5_Figures_for_article/utils.R")
 
-        r_function = robjects.r['plot_the_SPM_and_plume_maps']
+        r_function = robjects.r['Figure_4']
 
         # Call the R function
         r_function(
-            
+            where_to_save_the_figure = robjects.StrVector([where_to_save_the_plot]),
+            name_of_the_plot = robjects.StrVector([name_of_the_plot])
         )

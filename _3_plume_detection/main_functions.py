@@ -6,16 +6,17 @@ import rpy2.robjects as robjects
 from utils import (align_bathymetry_to_resolution, 
                             unique_years_between_two_dates, load_shapefile_data,
                             path_to_fill_to_where_to_save_satellite_files,
-                            fill_the_sat_paths, get_all_cases_to_process_for_regional_maps_or_plumes_or_X11)
+                            fill_the_sat_paths, get_all_cases_to_process_for_regional_maps_or_plumes_or_X11,
+                            define_parameters)
 
-from _3_plume_detection.utils import (main_process, define_parameters, reduce_resolution, 
-                                      create_polygon_mask, preprocess_annual_dataset_and_compute_land_mask)
+from _3_plume_detection.utils import (reduce_resolution, create_polygon_mask, preprocess_annual_dataset_and_compute_land_mask)
 
 import _3_plume_detection.utils
 
 
 def apply_plume_mask(core_arguments, Zones, detect_plumes_on_which_temporal_resolution_data,
-                    nb_of_cores_to_use, where_are_saved_regional_maps, where_to_save_plume_results) :
+                    nb_of_cores_to_use, use_dynamic_threshold, 
+                    where_are_saved_regional_maps, where_to_save_plume_results) :
     
     """
     Apply a plume mask to satellite data.
@@ -116,7 +117,8 @@ def apply_plume_mask(core_arguments, Zones, detect_plumes_on_which_temporal_reso
                               land_mask,
                               inside_polygon_mask,
                               where_to_save_plume_results,
-                              where_are_saved_regional_maps) for file_name in file_names ])
+                              where_are_saved_regional_maps,
+                              use_dynamic_threshold) for file_name in file_names ])
         
         # Create a DataFrame from the results, sort by date, and save it to a CSV
         statistics = pd.DataFrame([x for x in results if x is not None]).sort_values('date').reset_index(drop = True)

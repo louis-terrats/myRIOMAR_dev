@@ -1,12 +1,4 @@
-# library(plyr)
-# library(tidyverse)
-# library(scales) 
-# library(viridis)
-# # library(MASS)
-# library(Metrics)
-
-
-list_of_packages <- c("plyr", "tidyverse", "scales", "viridis", "ggExtra", "Metrics", "MASS")
+list_of_packages <- c("plyr", "tidyverse", "scales", "viridis", "ggExtra", "Metrics", "MASS", "gt")
 new.packages <- list_of_packages[!(list_of_packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 lapply(list_of_packages, require, character.only = TRUE)
@@ -32,7 +24,7 @@ lapply(list_of_packages, require, character.only = TRUE)
 # satellite_algorithm = 'suspended_matters'
 # site_name = c('Marseillan (a)','SÃ¨te mer','Parc Leucate 2','Marseillan (a)','SÃ¨te mer','Barcares','Parc Leucate 2','Barcares','Marseillan (a)','Parc Leucate 2')
 # region_name = c('Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion',
-#                'Bagdad', 'Bagdad', 'Bagdad', 'Bagdad')
+#                 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion')
 # zones = c('GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY')
 # where_to_save_MU_results <- '/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/'
 
@@ -53,9 +45,19 @@ Save_validation_scatterplots_and_stats <- function(satellite_median, satellite_n
                      "satellite_source", "satellite_sensor", "satellite_atm_corr", "satellite_algorithm",
                      "where_to_save_MU_results"))
   
+  # args$region_name <- ifelse(args$region_name == 'Manche orientale - Mer du Nord', 'Baie de Seine',
+  #                     ifelse(args$region_name == 'Baie de Seine', 'Baie de Seine',
+  #                     ifelse(args$region_name == 'Manche occidentale', 'Bretagne Sud',
+  #                     ifelse(args$region_name == 'Bretagne Sud', 'Bretagne Sud',
+  #                     ifelse(args$region_name == 'Pays de la Loire - Pertuis', 'Golfe de Gascogne',
+  #                     ifelse(args$region_name == 'Sud Golfe de Gascogne', 'Golfe de Gascogne',
+  #                     ifelse(args$region_name == 'Golfe du Lion', 'Golfe du Lion',
+  #                     ifelse(args$region_name == 'Mer ligurienne - Corse', 'Golfe du Lion',
+  #                     "Not found"))))))))
+  
   unique(args$insitu_variable) %>% l_ply(function(insitu_var) {
     
-    plot_title = paste("In-situ", insitu_var, "Vs.", "Satellite",  
+    plot_title = paste("In situ", insitu_var, "Vs.", "Satellite",  
                        paste(args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = " / "))
     plot_subtitle = paste("Grid size = ", args$grid_size, " x ", args$grid_size," / Variation Coefficient ≤ ", args$max_CV, "% / n ≥ ", args$min_n, ' / time difference ≤ ', args$max_hour_diff, "h", sep = "")
     
@@ -91,7 +93,8 @@ Save_validation_scatterplots_and_stats <- function(satellite_median, satellite_n
     }, .inform = TRUE) %>% 
       setNames(regions_to_process)
     
-    Figures <- make_the_figures(args$insitu_value[final_mask_index], args$satellite_median[final_mask_index], 
+    Figures <- make_the_figures(args$insitu_value[final_mask_index], 
+                                args$satellite_median[final_mask_index], 
                                 Year[final_mask_index], Month[final_mask_index],
                                 args$region_name[final_mask_index],
                                 args$insitu_Data_source[final_mask_index],
@@ -102,17 +105,80 @@ Save_validation_scatterplots_and_stats <- function(satellite_median, satellite_n
     # if (variable %>% str_detect("SST")) { 
     save_plot_as_png(Figures$scatterplot_with_side_histograms, 
                      name = paste("Insitu", insitu_var, "Vs", "Satellite", args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = "_"), 
-                     path = file.path(args$where_to_save_MU_results, paste(args$zones, collapse = "_&_"), "SCATTERPLOTS", "Per_sat_product"), 
+                     path = file.path(args$where_to_save_MU_results, "SCATTERPLOTS", "Per_sat_product"), 
                      width = 22, height = 16)
     
-    save_file_as_csv(statistics_values %>% convert_list_to_df() %>% dplyr::select_at(vars(-ends_with("_line"), -contains("_line_"))), 
-                     file.path(args$where_to_save_MU_results, paste(args$zones, collapse = "_&_"), "STATISTICS", "Per_sat_product",
-                               paste(args$satellite_algorithm, args$satellite_source, args$satellite_sensor, args$satellite_atm_corr, sep = "_")))
+    save_file_as_csv(statistics_values %>% convert_list_to_df() %>% dplyr::select_at(vars(-ends_with("_line"), -contains("_line_"))) %>% 
+                       mutate("insitu_var" = insitu_var, 'satellite_var' = args$satellite_algorithm), 
+                     file.path(args$where_to_save_MU_results, "STATISTICS", "Per_sat_product",
+                               paste("Insitu", insitu_var, "Vs", "Satellite", 
+                                     args$satellite_algorithm, args$satellite_source, 
+                                     args$satellite_sensor, args$satellite_atm_corr, sep = "_")))
     
   }, .inform = TRUE)
   
 }
 
+
+
+
+# satellite_median = c(4,0.549999987706542,3,2,0.5999999865889549,1.1099999751895666,1,0.9699999783188104,3,5)
+# satellite_n = c(0, 1, 0, 0, 1, 1, 0, 1, 0, 0)
+# satellite_sd = c(NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
+# satellite_times = c(NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN)
+# insitu_variable = c('SPM', 'SPM', 'SPM', 'SPM', 'SPM', 'SPM', 'TURB', 'TURB', 'TURB', 'TURB')
+# insitu_value = c(0.034, 0.331, 0.787, 0.148, 0.297, 0.217, 0.342, 0.342, 0.182, 0.354)
+# insitu_time = c('11:15:00','10:10:00','11:40:00','14:00:00','10:30:00','11:05:00','11:35:00','10:45:00','10:10:00','11:20:00')
+# insitu_Data_source = c('REPHY','REPHY','REPHY','REPHY','REPHY','REPHY','REPHY','REPHY','REPHY','REPHY')
+# min_n = 1
+# max_CV = NaN
+# max_hour_diff = NaN
+# grid_size = 1
+# date = c('2018-01-02','2018-01-02','2018-01-08','2018-01-16','2018-01-16','2018-01-15','2018-01-15','2018-01-29','2018-01-29','2018-01-29')
+# satellite_source = 'SEXTANT'
+# satellite_sensor = 'modis'
+# satellite_atm_corr = 'Standard'
+# satellite_algorithm = 'suspended_matters'
+# site_name = c('Marseillan (a)','SÃ¨te mer','Parc Leucate 2','Marseillan (a)','SÃ¨te mer','Barcares','Parc Leucate 2','Barcares','Marseillan (a)','Parc Leucate 2')
+# region_name = c('Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion',
+#                 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion', 'Golfe du Lion')
+# zones = c('GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY')
+where_to_save_MU_results <- '/home/terrats/Desktop/RIOMAR/TEST/MATCH_UP_DATA/GULF_OF_LION_&_BAY_OF_SEINE_&_BAY_OF_BISCAY_&_SOUTHERN_BRITTANY'
+
+Summarize_statistics_in_a_table <- function(where_to_save_MU_results) {
+  
+  ### Redo the match-up at first ! Because the zones are not good. 
+  stat_files <- file.path(where_to_save_MU_results, "STATISTICS", "Per_sat_product") %>% 
+                  list.files(pattern = "*.csv", full.names = TRUE) %>% 
+                  ldply(read.csv) %>% 
+                  dplyr::select(Region, Bias = bias_Pahlevan, Error = error_Pahlevan, n, insitu_var) %>% 
+                  mutate_at(vars(-Region, -insitu_var), ~ round(., 1)) %>% 
+                  mutate(insitu_var = paste("When compared with in situ", ifelse(insitu_var == 'TURB', 'Turbidity', 'SPM')))
+
+  desired_colnames <- names(stat_files) %>% str_replace_all("Bias", "Bias (%)") %>% str_replace_all("Error", "Error (%)") %>% str_remove_all("insitu_var")
+  names(desired_colnames) <- names(stat_files)
+  
+  the_Table <- stat_files %>% 
+    rowwise %>% mutate(Region = paste0("**", Region, "**")) %>% 
+    gt(rowname_col = 'Region', groupname_col = 'insitu_var', process_md = TRUE) %>% 
+    cols_label(.list = desired_colnames) %>% 
+    tab_spanner(label = md('**Metrics**'), columns = c("Error", 'Bias', "n")) %>% 
+    tab_header(title = 'Performances of satellite SPM', subtitle = 'Compared with SPM and Turbidity in situ measurements.') %>% 
+    sub_missing(missing_text = "-") %>% 
+    
+    tab_options(data_row.padding = px(2),
+                summary_row.padding = px(3), # A bit more padding for summaries
+                row_group.padding = px(4)    # And even more for our groups
+    ) %>% 
+    opt_stylize(style = 6, color = 'gray') %>%
+    tab_style(
+      style = cell_text(align = "center"),
+      locations = cells_column_labels()
+    )
+  
+  the_Table %>% gtsave(file.path(where_to_save_MU_results, "STATISTICS", "Per_sat_product", "Table.html"))
+  
+}
 
 
 
@@ -141,7 +207,8 @@ save_plot_as_png <- function(plot, name = c(), width = 14, height = 8.27, path, 
 }
 
 ggplot_theme <-   function() {
-  theme(text = element_text(size=35, colour = "black"), #25
+  theme(
+        text = element_text(size=35, colour = "black"), #25
         plot.title = element_text(hjust = 0.5, size = 55),
         plot.subtitle = element_text(hjust = 0.5, size = 30),
         panel.grid.major = element_blank(),
@@ -300,18 +367,23 @@ colors_of_stations <- function() {
   #                  "Point B" = rocket(n = 1,begin = 0.95,end = 0.95)
   # ) 
   
-  color_values = c('Manche orientale - Mer du Nord' = mako(n = 1,begin = 0.8,end = 0.8), # Manche
-                   'Baie de Seine' = mako(n = 1,begin = 0.95,end = 0.95),
-
-                   'Manche occidentale' = viridis(n = 1,begin = 1,end = 1), # Bretagne
-                   'Bretagne Sud' = viridis(n = 1,begin = 0.625,end = 0.625),
-
-                   'Pays de la Loire - Pertuis' = plasma(n = 1,begin = 0.05,end = 0.05), # Golfe de Gascogne
-                   'Sud Golfe de Gascogne' = plasma(n = 1,begin = 0.35,end = 0.35),
-
-                   'Golfe du Lion' = rocket(n = 1,begin = 0.80,end = 0.80), # Golfe du Lion
-                   'Mer ligurienne - Corse' = rocket(n = 1,begin = 0.95,end = 0.95)
-  )
+  # color_values = c('Manche orientale - Mer du Nord' = mako(n = 1,begin = 0.8,end = 0.8), # Manche
+  #                  'Baie de Seine' = mako(n = 1,begin = 0.95,end = 0.95),
+  # 
+  #                  'Manche occidentale' = viridis(n = 1,begin = 1,end = 1), # Bretagne
+  #                  'Bretagne Sud' = viridis(n = 1,begin = 0.625,end = 0.625),
+  # 
+  #                  'Pays de la Loire - Pertuis' = plasma(n = 1,begin = 0.05,end = 0.05), # Golfe de Gascogne
+  #                  'Sud Golfe de Gascogne' = plasma(n = 1,begin = 0.35,end = 0.35),
+  # 
+  #                  'Golfe du Lion' = rocket(n = 1,begin = 0.80,end = 0.80), # Golfe du Lion
+  #                  'Mer ligurienne - Corse' = rocket(n = 1,begin = 0.95,end = 0.95)
+  # )
+  
+  color_values = c('BAY OF SEINE' = mako(n = 1,begin = 0.8,end = 0.8),
+                   'SOUTHERN BRITTANY' = viridis(n = 1,begin = 0.9,end = 0.9),
+                   'GULF OF BISCAY' = plasma(n = 1,begin = 0.05,end = 0.05),
+                   'GULF OF LION' = rocket(n = 1,begin = 0.80,end = 0.80))
   
   return(color_values)
 
@@ -369,7 +441,7 @@ make_the_figures <- function(insitu_value, satellite_median, Year, Month,
     scale_x_continuous(
       trans = "log10",
       labels = trans_format("log10", math_format(10^.x)),
-      name = parse(text = paste0('Insitu~measurements~(', unit_color_and_axis_limits$unit, ')'))) +
+      name = parse(text = paste0('In~situ~measurements~(', unit_color_and_axis_limits$unit, ')'))) +
     
     scale_y_continuous(
       trans = "log10",
@@ -384,7 +456,7 @@ make_the_figures <- function(insitu_value, satellite_median, Year, Month,
              label = paste('Error = ', round( ifelse(Error_value %>% is.numeric(),Error_value, NA), 1), "%\n",
                            'Bias = ', round(ifelse(Bias_value %>% is.numeric(),Bias_value, NA), 1), " %\n",
                            # 'r² (linearity) = ', round(statistics_values$r2_log, 2),"\n",
-                           'Slope = ', round(ifelse(Slope_value %>% is.numeric(),Slope_value, NA), 2),"\n",
+                           # 'Slope = ', round(ifelse(Slope_value %>% is.numeric(),Slope_value, NA), 2),"\n",
                            'n = ', nrow(MU_data), sep = "")) + 
     
     labs(title = plot_title, subtitle = plot_subtitle, shape = "") +
@@ -394,14 +466,13 @@ make_the_figures <- function(insitu_value, satellite_median, Year, Month,
     scale_linetype_manual(values = c("Identity line" = "dashed",
                                      "Linear regression" = "solid"), name = "") +
     
-    guides(color=guide_legend(ncol=2, override.aes = list(size = 5),
-                              label.theme = element_text(size = 20), order = 1),
-           shape=guide_legend(ncol=1, override.aes = list(size = 5),
-                              label.theme = element_text(size = 20), order = 3),
+    guides(color=guide_legend(ncol=1, override.aes = list(size = 10),
+                              order = 1),
+           shape=guide_legend(ncol=1, override.aes = list(size = 10),
+                              order = 3),
            linetype = guide_legend(override.aes = list(color = c("black"),
                                                        shape = c(NA),
                                                        linetype = c("dashed")),
-                                   label.theme = element_text(size = 20),
                                    ncol = 2), order = 2) +
     
     ggplot_theme() + 
@@ -409,20 +480,21 @@ make_the_figures <- function(insitu_value, satellite_median, Year, Month,
     theme(legend.background = element_rect(fill = "transparent"),
           legend.box.background = element_rect(fill = "white", color = "black"),
           legend.position = c(.8,.2),
+          legend.text = element_text(size = 30),
           legend.margin=margin(c(-30,5,5,5)),
           plot.subtitle = element_text(hjust = 0.5, color = "black", face = "bold.italic"),
           plot.title = element_text(color = unit_color_and_axis_limits$color, face = "bold", size = 35))
   
   if (satellite_algorithm %>% str_detect("SST")) { 
     scatterplot <- scatterplot +  
-      geom_line(data = statistics_values$lm_line, aes(x = x, y = y_pred, linetype = "Linear regression"),
-                color = "black", linewidth = 1.5) + 
-      scale_x_continuous(name = parse(text = paste0('Insitu~measurements~(', unit_color_and_axis_limits$unit, ')'))) +
+      # geom_line(data = statistics_values$lm_line, aes(x = x, y = y_pred, linetype = "Linear regression"),
+      #           color = "black", linewidth = 1.5) + 
+      scale_x_continuous(name = parse(text = paste0('In~situ~measurements~(', unit_color_and_axis_limits$unit, ')'))) +
       scale_y_continuous(name = parse(text = paste0('Satellite~estimates~(', unit_color_and_axis_limits$unit, ')')))
   } else {
     scatterplot <- scatterplot + 
-      geom_line(data = statistics_values$lm_line_log, aes(x = x, y = y_pred, linetype = "Linear regression"),
-                color = "black", linewidth = 1.5) +
+      # geom_line(data = statistics_values$lm_line_log, aes(x = x, y = y_pred, linetype = "Linear regression"),
+      #           color = "black", linewidth = 1.5) +
       annotation_logticks()
   }
   

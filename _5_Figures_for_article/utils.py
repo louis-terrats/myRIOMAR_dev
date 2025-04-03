@@ -12,8 +12,7 @@ import pandas as pd
 
 import glob, os, pickle
 
-from utils import path_to_fill_to_where_to_save_satellite_files
-from _3_plume_detection.utils import define_parameters
+from utils import path_to_fill_to_where_to_save_satellite_files, define_parameters
 from _1_data_validation.utils import get_insitu_measurements
 
                    
@@ -38,30 +37,8 @@ def save_files_for_Figure_1(where_are_saved_satellite_data, where_to_save_the_fi
                    .drop(columns=["time"]))
         
         SPM_map.to_csv(folder_where_to_save_Figure_1_data + "/SPM_map.csv")
-            
-    coordinates_of_the_RIOMARS = { zone_name : {'lat_min' : define_parameters(zone_name)['lat_range_of_the_map_to_plot'][0],
-                                                'lat_max' : define_parameters(zone_name)['lat_range_of_the_map_to_plot'][1],
-                                                'lon_min' : define_parameters(zone_name)['lon_range_of_the_map_to_plot'][0],
-                                                'lon_max' : define_parameters(zone_name)['lon_range_of_the_map_to_plot'][1]}
-                                  for zone_name in ['GULF_OF_LION', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY', 'BAY_OF_SEINE'] }
-    
-    pd.DataFrame.from_dict(coordinates_of_the_RIOMARS).to_csv(folder_where_to_save_Figure_1_data + "/RIOMAR_limits.csv")
-    
-    _, insitu_stations = get_insitu_measurements()
-    station_LATITUDES = insitu_stations.LATITUDE.to_numpy(dtype=float)
-    station_LONGITUDES = insitu_stations.LONGITUDE.to_numpy(dtype=float)
-    
-    index_of_stations_in_the_RIOMARS = [ np.where((station_LATITUDES >= coords['lat_min']) & 
-                                                  (station_LATITUDES <= coords['lat_max']) & 
-                                                  (station_LONGITUDES >= coords['lon_min']) & 
-                                                  (station_LONGITUDES <= coords['lon_max']) )[0] 
-                                        for coords in coordinates_of_the_RIOMARS.values() ]
-    
-    index_of_stations_in_the_RIOMARS = np.unique(np.concatenate(index_of_stations_in_the_RIOMARS))
-    
-    stations_in_the_RIOMARS = insitu_stations.iloc[index_of_stations_in_the_RIOMARS]
-    
-    stations_in_the_RIOMARS.to_csv(folder_where_to_save_Figure_1_data + "/Stations_position.csv")
+          
+    extract_insitu_stations_and_save_the_file_for_plot(folder_where_to_save_Figure_1_data)
     
     
 def load_the_regional_maps_and_save_them_for_plotting(where_are_saved_regional_maps, where_to_save_the_figure, dates_for_each_zone) :
@@ -69,7 +46,7 @@ def load_the_regional_maps_and_save_them_for_plotting(where_are_saved_regional_m
     folder_where_to_save_Figure_2_data = os.path.join(where_to_save_the_figure, 'ARTICLE', 'FIGURES', 'FIGURE_2', 'DATA')
     os.makedirs(folder_where_to_save_Figure_2_data, exist_ok = True)
     
-    path_to_regional_maps = {key : (path_to_fill_to_where_to_save_satellite_files( os.path.join(where_are_saved_regional_maps, key) )
+    path_to_regional_maps = {key : (path_to_fill_to_where_to_save_satellite_files( os.path.join(where_are_saved_regional_maps, 'RESULTS', key) )
                                        .replace('[DATA_SOURCE]/[PARAMETER]/[SENSOR]/[ATMOSPHERIC_CORRECTION]/[TIME_FREQUENCY]',
                                                 'SEXTANT/SPM/merged/Standard/MAPS/DAILY')
                                        .replace('[YEAR]/[MONTH]/[DAY]', f'{date[:4]}/{date}.pkl')) 
@@ -91,3 +68,31 @@ def load_the_regional_maps_and_save_them_for_plotting(where_are_saved_regional_m
                        .reset_index())
             
             SPM_map.to_csv(folder_where_to_save_Figure_2_data + f"/{key}.csv")
+            
+    extract_insitu_stations_and_save_the_file_for_plot(folder_where_to_save_Figure_2_data)
+            
+def extract_insitu_stations_and_save_the_file_for_plot(folder_where_to_save_Figure_data) :     
+
+    coordinates_of_the_RIOMARS = { zone_name : {'lat_min' : define_parameters(zone_name)['lat_range_of_the_map_to_plot'][0],
+                                                'lat_max' : define_parameters(zone_name)['lat_range_of_the_map_to_plot'][1],
+                                                'lon_min' : define_parameters(zone_name)['lon_range_of_the_map_to_plot'][0],
+                                                'lon_max' : define_parameters(zone_name)['lon_range_of_the_map_to_plot'][1]}
+                                  for zone_name in ['GULF_OF_LION', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY', 'BAY_OF_SEINE'] }
+    
+    pd.DataFrame.from_dict(coordinates_of_the_RIOMARS).to_csv(folder_where_to_save_Figure_data + "/RIOMAR_limits.csv")
+    
+    _, insitu_stations = get_insitu_measurements()
+    station_LATITUDES = insitu_stations.LATITUDE.to_numpy(dtype=float)
+    station_LONGITUDES = insitu_stations.LONGITUDE.to_numpy(dtype=float)
+    
+    index_of_stations_in_the_RIOMARS = [ np.where((station_LATITUDES >= coords['lat_min']) & 
+                                                  (station_LATITUDES <= coords['lat_max']) & 
+                                                  (station_LONGITUDES >= coords['lon_min']) & 
+                                                  (station_LONGITUDES <= coords['lon_max']) )[0] 
+                                        for coords in coordinates_of_the_RIOMARS.values() ]
+    
+    index_of_stations_in_the_RIOMARS = np.unique(np.concatenate(index_of_stations_in_the_RIOMARS))
+    
+    stations_in_the_RIOMARS = insitu_stations.iloc[index_of_stations_in_the_RIOMARS]
+    
+    stations_in_the_RIOMARS.to_csv(folder_where_to_save_Figure_data + "/Stations_position.csv")

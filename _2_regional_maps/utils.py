@@ -180,10 +180,10 @@ def load_file_and_extract_key_data(nc_file, info, where_to_save_data_extended, d
     map_ini = map_ini.sortby('lon')
     
     # Get coordinates for the site
-    coordinates = get_coordinates_of_the_site(info.Zone)
+    # coordinates = get_coordinates_of_the_site(info.Zone)
 
     # Extract data for the Basin zone
-    Basin_data = extract_key_data(map_ini, info, zone_limits = coordinates['Basin_limits'])
+    Basin_data = extract_key_data(map_ini, info, zone_limits = basin_coordinates)
              
     if Basin_data['n'] == 0 : 
         return "All Basin data are NAN"
@@ -451,120 +451,120 @@ def determine_the_week_based_on_the_day(num_of_day) :
     return week
 
 
-def get_coordinates_of_the_site(Study_area) : 
+# def get_coordinates_of_the_site(Study_area) : 
         
-    """
-    Get geographic coordinates and spatial extents for a given study area.
+#     """
+#     Get geographic coordinates and spatial extents for a given study area.
 
-    Parameters
-    ----------
-    Study_area : str
-        Name of the study area (e.g., "GULF_OF_LION", "BAY_OF_BISCAY").
+#     Parameters
+#     ----------
+#     Study_area : str
+#         Name of the study area (e.g., "GULF_OF_LION", "BAY_OF_BISCAY").
 
-    Returns
-    -------
-    dict
-        A dictionary containing basin limits, embouchure, and bloom coordinates and extents.
-    """
+#     Returns
+#     -------
+#     dict
+#         A dictionary containing basin limits, embouchure, and bloom coordinates and extents.
+#     """
     
-    # Define spatial parameters based on the study area.
-    if Study_area == "GULF_OF_LION" : 
+#     # Define spatial parameters based on the study area.
+#     if Study_area == "GULF_OF_LION" : 
 
-        Basin_limits = [41.2, 43.6, 2.75, 9] # (Lat min , Lat max, Lon min, Lon max)
+#         Basin_limits = [41.2, 43.6, 2.75, 9] # (Lat min , Lat max, Lon min, Lon max)
         
-        Embouchure_central_point = [43.2, 4.6] # (Lat, Lon) # [43.24, 4.75] 
-        Embouchure_lat_extend = 0.5 # 0.55
-        Embouchure_lon_extend = 0.75 # 0.75
+#         Embouchure_central_point = [43.2, 4.6] # (Lat, Lon) # [43.24, 4.75] 
+#         Embouchure_lat_extend = 0.5 # 0.55
+#         Embouchure_lon_extend = 0.75 # 0.75
         
-        Bloom_central_point = [42.05, 5.2] # (Lat, Lon)
-        Bloom_lat_extend = 1.7 # 1.25
-        Bloom_lon_extend = 3.25 # 2.25
+#         Bloom_central_point = [42.05, 5.2] # (Lat, Lon)
+#         Bloom_lat_extend = 1.7 # 1.25
+#         Bloom_lon_extend = 3.25 # 2.25
         
-    if Study_area == "BAY_OF_BISCAY" : 
+#     if Study_area == "BAY_OF_BISCAY" : 
 
-        Basin_limits = [43, 49, -7, -0.5] # (Lat min , Lat max, Lon min, Lon max)
+#         Basin_limits = [43, 49, -7, -0.5] # (Lat min , Lat max, Lon min, Lon max)
         
-        Embouchure_central_point = [45.6, -1.5] # (Lat, Lon) # [43.24, 4.75] 
-        Embouchure_lat_extend = 1 # 0.55
-        Embouchure_lon_extend = 1 # 0.75
+#         Embouchure_central_point = [45.6, -1.5] # (Lat, Lon) # [43.24, 4.75] 
+#         Embouchure_lat_extend = 1 # 0.55
+#         Embouchure_lon_extend = 1 # 0.75
         
-        # Bloom_central_point = [45.5, -2.5] # (Lat, Lon)
-        # Bloom_lat_extend = 2 # 1.25
-        # Bloom_lon_extend = 1 # 2.25
+#         # Bloom_central_point = [45.5, -2.5] # (Lat, Lon)
+#         # Bloom_lat_extend = 2 # 1.25
+#         # Bloom_lon_extend = 1 # 2.25
         
-        Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
-        Bloom_lat_extend = 0 # 1.25
-        Bloom_lon_extend = 0 # 2.25
+#         Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
+#         Bloom_lat_extend = 0 # 1.25
+#         Bloom_lon_extend = 0 # 2.25
         
-    if Study_area == "SOUTHERN_BRITTANY" : 
+#     if Study_area == "SOUTHERN_BRITTANY" : 
 
-         Basin_limits = [46, 48.5, -5, -1.5] # (Lat min , Lat max, Lon min, Lon max)
+#          Basin_limits = [46, 48.5, -5, -1.5] # (Lat min , Lat max, Lon min, Lon max)
          
-         Embouchure_central_point = [47.125, -2.75] # (Lat, Lon) # [43.24, 4.75] 
-         Embouchure_lat_extend = 1.25 # 0.55
-         Embouchure_lon_extend = 1.5 # 0.75
+#          Embouchure_central_point = [47.125, -2.75] # (Lat, Lon) # [43.24, 4.75] 
+#          Embouchure_lat_extend = 1.25 # 0.55
+#          Embouchure_lon_extend = 1.5 # 0.75
          
-         Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
-         Bloom_lat_extend = 0 # 1.25
-         Bloom_lon_extend = 0 # 2.25
+#          Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
+#          Bloom_lat_extend = 0 # 1.25
+#          Bloom_lon_extend = 0 # 2.25
         
-    if Study_area == "FRANCE" : 
+#     if Study_area == "FRANCE" : 
 
-        Basin_limits = [41, 52, -8, 11] # (Lat min , Lat max, Lon min, Lon max)
+#         Basin_limits = [41, 52, -8, 11] # (Lat min , Lat max, Lon min, Lon max)
         
-        Embouchure_central_point = [np.nan, np.nan] # (Lat, Lon) # [43.24, 4.75] 
-        Embouchure_lat_extend = 0 # 0.55
-        Embouchure_lon_extend = 0 # 0.75
+#         Embouchure_central_point = [np.nan, np.nan] # (Lat, Lon) # [43.24, 4.75] 
+#         Embouchure_lat_extend = 0 # 0.55
+#         Embouchure_lon_extend = 0 # 0.75
         
-        Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
-        Bloom_lat_extend = 0 # 1.25
-        Bloom_lon_extend = 0 # 2.25
+#         Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
+#         Bloom_lat_extend = 0 # 1.25
+#         Bloom_lon_extend = 0 # 2.25
         
-    if Study_area == "BAY_OF_SEINE" : 
+#     if Study_area == "BAY_OF_SEINE" : 
 
-        Basin_limits = [49.16, 51.38, -1.61, 2.6] # (Lat min , Lat max, Lon min, Lon max)
+#         Basin_limits = [49.16, 51.38, -1.61, 2.6] # (Lat min , Lat max, Lon min, Lon max)
         
-        Embouchure_central_point = [49.5, 0] # (Lat, Lon) # [43.24, 4.75] 
-        Embouchure_lat_extend = 0.3 # 0.55
-        Embouchure_lon_extend = 0.5 # 0.75
+#         Embouchure_central_point = [49.5, 0] # (Lat, Lon) # [43.24, 4.75] 
+#         Embouchure_lat_extend = 0.3 # 0.55
+#         Embouchure_lon_extend = 0.5 # 0.75
         
-        Bloom_central_point = [49.8, 0.15] # (Lat, Lon)
-        Bloom_lat_extend = 1 # 1.25
-        Bloom_lon_extend = 1.5 # 2.25
+#         Bloom_central_point = [49.8, 0.15] # (Lat, Lon)
+#         Bloom_lat_extend = 1 # 1.25
+#         Bloom_lon_extend = 1.5 # 2.25
         
-    if Study_area == "EASTERN_CHANNEL" : 
+#     if Study_area == "EASTERN_CHANNEL" : 
 
-        Basin_limits = [49.16, 51.5, -1.61, 3] # (Lat min , Lat max, Lon min, Lon max)
+#         Basin_limits = [49.16, 51.5, -1.61, 3] # (Lat min , Lat max, Lon min, Lon max)
         
-        Embouchure_central_point = [50.45, 1.5] # (Lat, Lon) # [43.24, 4.75] 
-        Embouchure_lat_extend = 0.9 # 0.55
-        Embouchure_lon_extend = 0.5 # 0.75
+#         Embouchure_central_point = [50.45, 1.5] # (Lat, Lon) # [43.24, 4.75] 
+#         Embouchure_lat_extend = 0.9 # 0.55
+#         Embouchure_lon_extend = 0.5 # 0.75
         
-        Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
-        Bloom_lat_extend = 0 # 1.25
-        Bloom_lon_extend = 0 # 2.25
+#         Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
+#         Bloom_lat_extend = 0 # 1.25
+#         Bloom_lon_extend = 0 # 2.25
         
-    if Study_area == "ETANG_DE_BERRE" : 
+#     if Study_area == "ETANG_DE_BERRE" : 
 
-        Basin_limits = [43.37, 43.57, 4.97, 5.26] # (Lat min , Lat max, Lon min, Lon max)
+#         Basin_limits = [43.37, 43.57, 4.97, 5.26] # (Lat min , Lat max, Lon min, Lon max)
         
-        Embouchure_central_point = [np.nan, np.nan] # (Lat, Lon) # [43.24, 4.75] 
-        Embouchure_lat_extend = 0 # 0.55
-        Embouchure_lon_extend = 0 # 0.75
+#         Embouchure_central_point = [np.nan, np.nan] # (Lat, Lon) # [43.24, 4.75] 
+#         Embouchure_lat_extend = 0 # 0.55
+#         Embouchure_lon_extend = 0 # 0.75
         
-        Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
-        Bloom_lat_extend = 0 # 1.25
-        Bloom_lon_extend = 0 # 2.25
+#         Bloom_central_point = [np.nan, np.nan] # (Lat, Lon)
+#         Bloom_lat_extend = 0 # 1.25
+#         Bloom_lon_extend = 0 # 2.25
         
-    return {'Basin_limits' : Basin_limits,
+#     return {'Basin_limits' : Basin_limits,
             
-            'Embouchure_central_point' : Embouchure_central_point,
-            'Embouchure_lat_extend' : Embouchure_lat_extend,
-            'Embouchure_lon_extend' : Embouchure_lon_extend,
+#             'Embouchure_central_point' : Embouchure_central_point,
+#             'Embouchure_lat_extend' : Embouchure_lat_extend,
+#             'Embouchure_lon_extend' : Embouchure_lon_extend,
             
-            'Bloom_central_point' : Bloom_central_point,
-            'Bloom_lat_extend' : Bloom_lat_extend,
-            'Bloom_lon_extend' : Bloom_lon_extend}
+#             'Bloom_central_point' : Bloom_central_point,
+#             'Bloom_lat_extend' : Bloom_lat_extend,
+#             'Bloom_lon_extend' : Bloom_lon_extend}
 
 
 def do_and_save_the_plot(info, Basin_data, Embouchure_data, Bloom_data, 

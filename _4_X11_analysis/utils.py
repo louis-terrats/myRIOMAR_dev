@@ -4,7 +4,7 @@ import sys, os
 from scipy.stats import f, kruskal, norm, chi2, t
 from scipy import stats
 import matplotlib.pyplot as plt
-
+from pandas.core.window.rolling import Rolling
 
 #### Main
 
@@ -375,6 +375,9 @@ def temporal_decomp_V2_7_x11(values, dates, time_frequency,
 def apply_X11_method_and_save_results(values, variable_name, dates, info, where_to_save_X11_results) :
     
     filtered_values, filtered_dates = keep_the_dates_within_full_year(values, pd.to_datetime(dates))
+    
+    if info.Temporal_resolution == 'WEEKLY' : 
+        filtered_values = pd.Series(filtered_values).rolling(3, center = True, min_periods = 1).median().to_numpy()
     
     results = temporal_decomp_V2_7_x11(values = filtered_values, dates = filtered_dates, 
                                        time_frequency = info.Temporal_resolution,

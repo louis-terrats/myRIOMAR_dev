@@ -13,8 +13,7 @@ import rpy2.robjects as robjects
 
 from myRIOMAR_dev._4_X11_analysis.utils import (temporal_decomp_V2_7_x11, apply_X11_method_and_save_results)
 from utils import (get_all_cases_to_process_for_regional_maps_or_plumes_or_X11, path_to_fill_to_where_to_save_satellite_files, 
-                   fill_the_sat_paths, load_csv_files_in_the_package_folder)
-from _3_plume_detection.utils import define_parameters
+                   fill_the_sat_paths, load_csv_files_in_the_package_folder, define_parameters)
 
 
 ### S'INSPIRER DE LA FONCTION DNAS LE DOSSIER SCRIPTS
@@ -58,9 +57,11 @@ def Apply_X11_method_on_time_series(core_arguments, Zones, nb_of_cores_to_use,
         
         if include_river_flow :
             
-            river_flow_data = load_csv_files_in_the_package_folder(RIVER_FLOW = True, Zone_of_river_flow = info.Zone)
+            river_flow_data = load_csv_files_in_the_package_folder(RIVER_FLOW = True, Zone_of_river_flow = info.Zone,
+                                                                   RIVER_FLOW_time_resolution = info.Temporal_resolution)
             
-            apply_X11_method_and_save_results(values = river_flow_data.Values.tolist(), variable_name = 'river_flow', 
+            apply_X11_method_and_save_results(values = river_flow_data.Values.tolist(), 
+                                              variable_name = 'river_flow', 
                                               dates = river_flow_data.Date, 
                                               info = info.replace({info.Satellite_variable : "River_flow",
                                                                    info.atmospheric_correction : "",

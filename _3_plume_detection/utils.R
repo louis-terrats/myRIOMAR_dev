@@ -1,4 +1,4 @@
-list_of_packages <- c("plyr", "tidyverse", "ggpubr", "viridis", "doParallel")
+list_of_packages <- c("plyr", "tidyverse", "ggpubr", "viridis", "doParallel", "zoo")
 new.packages <- list_of_packages[!(list_of_packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 lapply(list_of_packages, require, character.only = TRUE)
@@ -7,11 +7,12 @@ lapply(list_of_packages, require, character.only = TRUE)
 
 # where_are_saved_plume_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST'
 # where_to_save_plume_time_series = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST'
-# Zone = c('GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY')
+# # Zone = c('GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY')
+# Zone = c('BAY_OF_SEINE')
 # Data_source = 'SEXTANT'
 # Satellite_sensor = c('merged')
 # atmospheric_correction = 'Standard'
-# Temporal_resolution = 'MONTHLY'
+# Temporal_resolution = 'WEEKLY'
 # Years = 1998:2024
 # Plumes = list('BAY_OF_BISCAY' = list('Gironde', 'Charente', 'Sevre'), 'SOUTHERN_BRITTANY' = list('Loire', 'Vilaine'),
 #               'GULF_OF_LION' = list('Grand Rhone', 'Petit Rhone'), 'BAY_OF_SEINE' = list('Seine'))
@@ -47,7 +48,7 @@ plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_
       
       where_to_save_the_file = file_to_load %>% str_replace(where_are_saved_plume_results, where_to_save_plume_time_series) %>% str_remove('/[A-Za-z]*.csv')
       
-      make_the_plot_from_the_df(data, row, where_to_save_the_file, "Time_series_of_plume_area_and_SPM_threshold")
+      make_the_plot_from_the_df(data, row, where_to_save_the_file, "Time_series_of_plume_area_and_SPM_threshold", Temporal_resolution)
       
       return(data)
       
@@ -96,7 +97,8 @@ plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_
         
         make_the_plot_from_the_df(data = ts_data_of_the_sub_case, row, 
                                   where_to_save_the_file = where_to_save_sub_case_data,
-                                  plot_name = 'Time_series_of_plume_area_and_SPM_threshold')
+                                  plot_name = 'Time_series_of_plume_area_and_SPM_threshold',
+                                  Temporal_resolution)
         
         save_file_as_csv(ts_data_of_the_sub_case, file.path(where_to_save_sub_case_data, 'Time_series_of_plume_area_and_SPM_threshold'))    
         
@@ -108,20 +110,12 @@ plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_
       
       make_the_plot_from_the_df(data = ts_data_of_the_case, row, 
                                 where_to_save_the_file = file.path(ts_data_of_the_case$path_to_file[1], row$PLUME_DETECTION),
-                                plot_name = paste('Time_series_of', row$Temporal_resolution, 'plume_area_and_SPM_threshold', sep = "_"))
+                                plot_name = paste('Time_series_of', row$Temporal_resolution, 'plume_area_and_SPM_threshold', sep = "_"),
+                                Temporal_resolution)
       
     }, .parallel = FALSE, .inform = TRUE)
   
 }
-
-
-
-plot_the_SPM_and_plume_maps <- function() {
-  
-  
-  
-}
-
 
 #### Utils ####
 
@@ -164,27 +158,45 @@ save_file_as_csv <- function(data, file_name) {
   data.table::fwrite(data %>% as.data.frame(), file = file_name, row.names = TRUE, col.names = TRUE)
 }
 
-plot_function <- function(data, y_variable) {
+plot_function <- function(data, y_variable, Temporal_resolution) {
   
   if ("Satellite_sensor" %in% names(data)) {
     ggplot_base <- ggplot(data, aes(x = date, y = .data[[y_variable]], group = Satellite_sensor, color = Satellite_sensor))  
   } else {
     ggplot_base <- ggplot(data, aes(x = date, y = .data[[y_variable]])) + labs(color = "")
   }
-  
-  ggplot_base +
+
+  the_plot <- ggplot_base +
     geom_line(linewidth = 1.5, na.rm = TRUE) + geom_point(size = 2, na.rm = TRUE) + 
     labs(y = case_when(grepl("^SPM_threshold", y_variable) ~ y_variable %>% str_replace_all("_", " ") %>% str_replace_all("threshold ", "threshold\n"),
                        y_variable == "area_of_the_plume_mask_in_km2" ~ "Plume area (km²)")) + 
     ggplot_theme() 
   
+  if (str_detect(y_variable, "threshold")) {
+    
+    window_size <- case_when(Temporal_resolution == "WEEKLY" ~ 8,
+                             Temporal_resolution == "MONTHLY" ~ 2,
+                             Temporal_resolution == "DAILY" ~ 60)+1
+    
+    smoothed_threshold_data <- rollmean(data[,y_variable], k = window_size, fill = "NA")
+    # smoothed_threshold_data <- rollmean(smoothed_threshold_data, k = window_size, fill = "NA")
+    data['smoothed_threshold_data'] <- smoothed_threshold_data
+    
+    the_plot <- the_plot + geom_line(aes(y = smoothed_threshold_data), 
+                                     linewidth = 1.5, na.rm = TRUE, color = "black")
+    
+  }
+  
+  return(the_plot)
+  
 }
 
-make_the_plot_from_the_df <- function(data, row, where_to_save_the_file, plot_name) {
+make_the_plot_from_the_df <- function(data, row, where_to_save_the_file, plot_name, Temporal_resolution) {
   
   SPM_thresholds_columns <- data %>% names() %>% grep(pattern = "^SPM_threshold", value = TRUE)
   
-  time_series_plot <- ggarrange(plotlist = c("area_of_the_plume_mask_in_km2", SPM_thresholds_columns) %>% llply(plot_function, data = data),
+  time_series_plot <- ggarrange(plotlist = c("area_of_the_plume_mask_in_km2", SPM_thresholds_columns) %>% 
+                                  llply(plot_function, data = data, Temporal_resolution = Temporal_resolution),
                                 ncol = 1, align = 'v', common.legend = TRUE)
   
   where_to_save_the_file %>% 

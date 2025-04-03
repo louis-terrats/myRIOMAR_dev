@@ -11,9 +11,7 @@ from utils import (add_array_to_dict, path_to_fill_to_where_to_save_satellite_fi
                             return_the_parameter_name_based_on_file_name, get_non_empty_paths,
                             extract_the_time_from_the_satellite_file, access_item_in_a_dictionnary, 
                             extract_dataframes_iterative, load_csv_files_in_the_package_folder,
-                            get_the_values_from_a_list_comprehension)
-
-from _3_plume_detection.utils import define_parameters
+                            get_the_values_from_a_list_comprehension, define_parameters)
 
 import re, datetime, os, pickle, multiprocessing, gc, glob
 
@@ -24,7 +22,7 @@ from joblib import dump, load
 #### Functions
 # =============================================================================
     
-def get_insitu_measurements(zones) : 
+def get_insitu_measurements(zones = ['FRANCE']) : 
         
     # =============================================================================
     #     SOMLIT
@@ -81,7 +79,18 @@ def get_insitu_measurements(zones) :
         'Point L': 'Manche orientale - Mer du Nord'
     }
     
-    SOMLIT_data_filtered['REGION'] = SOMLIT_data_filtered['SITE'].map(region_mapping).fillna('Region to fill')
+    zone_mapping = {
+        'Mer ligurienne - Corse' : 'GULF OF LION',
+        'Golfe du Lion' : 'GULF OF LION',
+        'Sud Golfe de Gascogne' : 'GULF OF BISCAY',         
+        'Pays de la Loire - Pertuis': 'GULF OF BISCAY',
+        'Bretagne Sud' : 'SOUTHERN BRITTANY',
+        'Manche occidentale' : 'SOUTHERN BRITTANY', 
+        'Baie de Seine' : 'BAY OF SEINE', 
+        'Manche orientale - Mer du Nord' : 'BAY OF SEINE'
+    }
+    
+    SOMLIT_data_filtered['REGION'] = SOMLIT_data_filtered['SITE'].map(region_mapping).fillna('Region to fill').map(zone_mapping).fillna('Region to fill')
     
     # SOMLIT_stations = SOMLIT_data_filtered.loc[:,["ID_SITE", "Site", "DATE", "HEURE", "Latitude", "Longitude"]].drop_duplicates().reset_index(drop = True)
 
@@ -122,6 +131,8 @@ def get_insitu_measurements(zones) :
     REPHY_data_filtered['TURB'] = REPHY_data_filtered['TURB']
     REPHY_data_filtered = REPHY_data_filtered.drop(['TURB_all', 'TURB-FNU'], axis = 1)
         
+    REPHY_data_filtered['REGION'] = REPHY_data_filtered['REGION'].map(zone_mapping).fillna('Region to fill')
+
     
     # =============================================================================
     #  MERGE ALL
@@ -411,6 +422,9 @@ def scatterplot_and_save_statistics(MU_summary_df, info, where_are_saved_Match_U
             where_to_save_MU_results = robjects.StrVector([where_are_saved_Match_Up_data])
             
         )
+        
+    r_function = robjects.r['Save_validation_scatterplots_and_stats']
+
 
 
 # =============================================================================
@@ -423,7 +437,7 @@ class MU_database_processing :
         
         grid_size = 9 # 9x9
         
-        path_to_MU_of_the_zone = os.path.join(where_to_save_Match_Up_data, "_&_".join(zones))
+        path_to_MU_of_the_zone = os.path.join(where_to_save_Match_Up_data, "MATCH_UP_DATA", "_&_".join(zones))
         os.makedirs( path_to_MU_of_the_zone , exist_ok=True)
                      
         path_to_the_MU_database = os.path.join(path_to_MU_of_the_zone, "MU_database.joblib")
@@ -434,7 +448,7 @@ class MU_database_processing :
             MU_database = []           
             
         self.MU_database = MU_database
-        self.where_to_save_Match_Up_data = where_to_save_Match_Up_data
+        self.where_to_save_Match_Up_data = path_to_MU_of_the_zone
         self.path_to_the_MU_database = path_to_the_MU_database
         self.grid_size = grid_size
         self.cases_to_process = cases_to_process
@@ -627,8 +641,8 @@ class MU_database_processing :
         
         if self.any_modification_has_been_done == False :          
 
-            self.MU_database_df = pd.read_csv(f"{base_path_to_save_data}database.csv", low_memory=False)
-            self.MU_summary_df = pd.read_csv(f"{base_path_to_save_data}summary.csv", low_memory=False)
+            self.MU_database_df = pd.read_csv(f"{base_path_to_save_data}/database.csv", low_memory=False)
+            self.MU_summary_df = pd.read_csv(f"{base_path_to_save_data}/summary.csv", low_memory=False)
             return
 
         MU_summary_df = process_data(self.MU_summary)
@@ -640,13 +654,14 @@ class MU_database_processing :
         self.MU_summary_df = MU_summary_df
         self.MU_database_df = MU_database_df
     
-        MU_database_df.to_csv(f"{base_path_to_save_data}database.csv")
-        MU_summary_df.to_csv(f"{base_path_to_save_data}summary.csv")
+        MU_database_df.to_csv(f"{base_path_to_save_data}/database.csv")
+        MU_summary_df.to_csv(f"{base_path_to_save_data}/summary.csv")
         
         
     def Make_scatterplot_and_save_statistics(self) : 
         
-        MU_summary_df = self.MU_summary_df.reset_index(drop = False)
+        # MU_summary_df = self.MU_summary_df.reset_index(drop = False)
+        MU_summary_df = pd.read_csv("/".join(self.path_to_the_MU_database.split('/')[:-1]) + '/summary.csv')
         where_to_save_Match_Up_plots = self.where_to_save_Match_Up_data
         cases_to_process = self.cases_to_process
         zones = self.zones

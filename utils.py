@@ -15,7 +15,7 @@ import geopandas as gpd
 import re
 from functools import reduce
 from collections.abc import Mapping, Iterable
-
+from concave_hull import concave_hull
 
 def exit_program():
     print("Exiting the program...")
@@ -491,7 +491,8 @@ def extract_and_format_date_from_path(path):
 
 
 def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False, FRANCE_shapefile = False, 
-                                         RIVER_FLOW = False, Zone_of_river_flow = None):
+                                         RIVER_FLOW = False, Zone_of_river_flow = None, 
+                                         RIVER_FLOW_time_resolution = ''):
     
     if SOMLIT : 
         with importlib.resources.open_text('myRIOMAR_dev.DATA.INSITU_data.SOMLIT', 'Somlit.csv') as f:
@@ -558,29 +559,28 @@ def load_csv_files_in_the_package_folder(SOMLIT = False, REPHY = False, FRANCE_s
         final_df = pd.concat(data_dict.values()).groupby("Date", as_index=False).agg(Values=('Flow', 'sum'), n_rivers=('Flow', 'count'))
         final_df = final_df[ final_df.n_rivers == len(files_to_read) ]
         
+        
+        bin_centers = [4, 12, 20, 28]
+        def assign_bin(day):
+            return min(bin_centers, key=lambda x: abs(x - day))
+        
+        # Apply the function to create a 'bin' column
+        final_df['bin'] = final_df['Date'].dt.day.apply(assign_bin)
+        final_df_reduced = final_df.loc[:,['Date', 'bin', 'Values']]
+        final_df_reduced['Values'] = pd.to_numeric(final_df_reduced['Values'])
+        
+        if RIVER_FLOW_time_resolution == 'WEEKLY' : 
+            final_df_binned = final_df_reduced.groupby([final_df_reduced['Date'].dt.to_period('M'), 'bin']).agg({'Values': 'mean'}).reset_index()
+            final_df_binned['Date'] = pd.to_datetime( final_df_binned['Date'].astype(str) + "-" + final_df_binned['bin'].astype(str), format = "%Y-%m-%d" )
+            final_df = final_df_binned
+            
+        if RIVER_FLOW_time_resolution == 'MONTHLY' :     
+            final_df_binned = final_df_reduced.groupby([final_df_reduced['Date'].dt.to_period('M')]).agg({'Values': 'mean'}).reset_index()
+            final_df_binned['Date'] = pd.to_datetime( final_df_binned['Date'].astype(str) + "-" + "15", format = "%Y-%m-%d" )
+            final_df = final_df_binned
+
         return final_df
-                
-    
-    
-        # bin_centers = [4, 12, 20, 28]
-        # def assign_bin(day):
-        #     return min(bin_centers, key=lambda x: abs(x - day))
-        
-        # # Apply the function to create a 'bin' column
-        # river_ts['bin'] = river_ts['Date'].dt.day.apply(assign_bin)
-        # river_ts_reduced = river_ts.loc[:,['Date', 'bin', var_to_use]]
-        # river_ts_reduced[var_to_use] = pd.to_numeric(river_ts_reduced[var_to_use])
-        
-        # if Time_resolution == 'WEEKLY' : 
-        #     river_ts_binned = river_ts_reduced.groupby([river_ts_reduced['Date'].dt.to_period('M'), 'bin']).agg({var_to_use: 'mean'}).reset_index()
-        #     river_ts_binned.index = pd.to_datetime( river_ts_binned['Date'].astype(str) + "-" + river_ts_binned['bin'].astype(str), format = "%Y-%m-%d" )
-            
-        # if Time_resolution == 'MONTHLY' :     
-        #     river_ts_binned = river_ts_reduced.groupby([river_ts_reduced['Date'].dt.to_period('M')]).agg({var_to_use: 'mean'}).reset_index()
-        #     river_ts_binned.index = pd.to_datetime( river_ts_binned['Date'].astype(str) + "-" + "15", format = "%Y-%m-%d" )
-            
-        # ts_data = river_ts_binned.sort_index()
-        
+         
         
 def get_the_values_from_a_list_comprehension(lst_comprehension, return_the_unique_values) : 
     
@@ -590,3 +590,377 @@ def get_the_values_from_a_list_comprehension(lst_comprehension, return_the_uniqu
         the_values = np.unique(the_values)
     
     return the_values
+
+
+def define_parameters(Zone) : 
+    
+    """
+    Define region-specific parameters based on the selected zone.
+
+    Parameters
+    ----------
+    Zone : str
+        Name of the geographic zone (e.g., "BAY_OF_SEINE", "BAY_OF_BISCAY").
+
+    Returns
+    -------
+    dict
+        A dictionary containing the parameters for the specified zone.
+    """
+        
+    if Zone == "BAY_OF_SEINE" :
+        
+        lon_new_resolution = 0.015
+        lat_new_resolution = 0.015
+        searching_strategies = {'Seine' : {'grid' : np.array([    [False, False, False, False, False],
+                                                                  [False, True,  True,  True,  False],
+                                                                  [False, True,  True,  False,  False],
+                                                                  [False, True,  True,  False,  False],
+                                                                  [False, False, False, False, False],
+                                                                ]),
+                                      'coordinates_of_center' : (2,2)}}
+        bathymetric_threshold = 0
+        starting_points = {'Seine' : (49.43, 0.145)}
+        core_of_the_plumes = {'Seine' : (49.43, 0)}
+        lat_range_of_the_area_to_check_for_clouds = [49.25, 49.75]
+        lon_range_of_the_area_to_check_for_clouds = [-0.3, 0.3]
+        threshold_of_cloud_coverage_in_percentage = 25
+        lat_range_of_the_map_to_plot = [49, 50.5] # [49.20, 51.25]
+        lon_range_of_the_map_to_plot = [-1.5, 2] # [-1.5, 2.5]
+        lat_range_to_search_plume_area = [49.25, 50.25]
+        lon_range_to_search_plume_area = [-1.5, 0.5]
+        maximal_bathymetric_for_zone_with_resuspension = {'Seine' : 30}
+        minimal_distance_from_estuary_for_zone_with_resuspension = {'Seine' : 30}
+        max_steps_for_the_directions = {'Seine' : 40}
+        maximal_threshold = {'Seine' : 11} # 15
+        minimal_threshold = {'Seine' : 7} # 4
+        quantile_to_use = {'Seine' : 0.10}
+        fixed_threshold = {'Seine' : 9.5}
+        river_mouth_to_exclude = {'Canal de Caen à la mer' : [49.296, -0.245]}
+        
+        
+    if Zone == "BAY_OF_BISCAY" :
+        
+        lon_new_resolution = 0.015
+        lat_new_resolution = 0.015
+        searching_strategies = {'Gironde' : {'grid' : np.array([  [False, False, False, False, False],
+                                                                  [False, True,  True, True, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, True,  False,  False, False],
+                                                                  [False, False, False, False, False],
+                                                                ]),
+                                      'coordinates_of_center' : (2,2)},
+                              
+                                  'Charente' : {'grid' : np.array([ [False, False, False, False, False],
+                                                                    [False, True,  True, False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, False, False, False, False],
+                                                                  ]),
+                                                                'coordinates_of_center' : (2,2)},
+                                  'Sevre' : {'grid' : np.array([  [False, False, False, False, False],
+                                                                  [False, True,  True, False, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, False, False, False, False],
+                                                                ]),
+                                                                'coordinates_of_center' : (2,2)}}
+        bathymetric_threshold = 0
+        starting_points = {'Gironde' : (45.59, -1.05),
+                          'Charente' : (45.96, -1.01),
+                          'Sevre' : (46.30, -1.13)}
+        core_of_the_plumes = {'Gironde' : (45.59, -1.05),
+                              # 'Gironde' : (45.65, -1.33),
+                              'Charente' : (45.98, -1.17),
+                              'Sevre' : (46.24, -1.24)}
+        lat_range_of_the_area_to_check_for_clouds = [45.5, 46.35]
+        lon_range_of_the_area_to_check_for_clouds = [-1.8, -1.2]
+        threshold_of_cloud_coverage_in_percentage = 25
+        lat_range_of_the_map_to_plot = [45, 46.75] # [44.75, 46.75]
+        lon_range_of_the_map_to_plot = [-3, -0.5] # [-4.5, -1]
+        lat_range_to_search_plume_area = [45, 46.5]
+        lon_range_to_search_plume_area = [-180, 180]
+        maximal_bathymetric_for_zone_with_resuspension = {'Gironde' : 20, 'Charente' : 20, 'Sevre' : 20}
+        minimal_distance_from_estuary_for_zone_with_resuspension = {'Gironde' : 30, 'Charente' : 20, 'Sevre' : 20}
+        max_steps_for_the_directions = {'Gironde' : 100, 'Charente' : 50, 'Sevre' : 50}
+        maximal_threshold = {'Gironde' : 8, 'Charente' : 10, 'Sevre' : 8} 
+        minimal_threshold = {'Gironde' : 4, 'Charente' : 6, 'Sevre' : 4} 
+        quantile_to_use = {'Gironde' : 0.2, 'Charente' : 0.2, 'Sevre' : 0.2} 
+        fixed_threshold = {'Gironde' : 4.7, 'Charente' : 7.8, 'Sevre' : 5.2} 
+        river_mouth_to_exclude = {}
+    
+    if Zone == "GULF_OF_LION" :   
+        
+        lon_new_resolution = 0.015
+        lat_new_resolution = 0.015
+        searching_strategies = {'Grand Rhone' : {'grid' : np.array([  [False, False, False, False, False, False, False],
+                                                                      [False, False, False, False, False, False, False],
+                                                                      [False, False, False,  True, False, False, False],
+                                                                      [True,  True,  True,  True,  True, True, True],
+                                                                      [False, False, False, False, False, False, False],
+                                                                    ]),
+                                      'coordinates_of_center' : (2,3)},
+                                
+                                'Petit Rhone' : {'grid' : np.array([    [False, False, False, False, False],
+                                                                        [False, False, False, False, False],
+                                                                        [False, False, True,  False, False],
+                                                                        [True,  True,  True,  True,  True],
+                                                                        [False, False, False, False, False],
+                                                                      ]),
+                                            'coordinates_of_center' : (2,2)}}
+        bathymetric_threshold = 25
+        starting_points = {'Grand Rhone' : (43.41, 4.83),
+                           'Petit Rhone' : (43.47, 4.39)}
+        core_of_the_plumes = {'Grand Rhone' : (43.32, 4.85),
+                              'Petit Rhone' : (43.43, 4.39)}
+        lat_range_of_the_area_to_check_for_clouds = [43, 43.4]
+        lon_range_of_the_area_to_check_for_clouds = [4.5, 5]
+        threshold_of_cloud_coverage_in_percentage = 25
+        lat_range_of_the_map_to_plot = [42.25, 44] # [42, 43.7]
+        lon_range_of_the_map_to_plot = [3.5, 6] # [2.75, 6.55]
+        lat_range_to_search_plume_area = [-90, 90]
+        lon_range_to_search_plume_area = [-180, 180]
+        maximal_bathymetric_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
+        minimal_distance_from_estuary_for_zone_with_resuspension = {'Grand Rhone' : 30, 'Petit Rhone' : 30}
+        max_steps_for_the_directions = {'Grand Rhone' : 35, 'Petit Rhone' : 35}
+        maximal_threshold = {'Grand Rhone' : 3, 'Petit Rhone' : 3} # 3
+        minimal_threshold = {'Grand Rhone' : 0.75, 'Petit Rhone' : 1} # 0.75
+        quantile_to_use = {'Grand Rhone' : 0.2, 'Petit Rhone' : 0.2}
+        fixed_threshold = {'Grand Rhone' : 1.2, 'Petit Rhone' : 1.9} 
+        river_mouth_to_exclude = {}
+        
+    if Zone == 'EASTERN_CHANNEL' :
+        
+        lon_new_resolution = 0.015
+        lat_new_resolution = 0.015
+        searching_strategies = {'Arques' : {'grid' : np.array([   [False, False, False, False, False],
+                                                                  [False, True,  True,  True, False],
+                                                                  [False, True,  True,  True, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, False, False, False, False],
+                                                                ]),
+                                      'coordinates_of_center' : (2,2)},
+                                'Bresle' : {'grid' : np.array([   [False, False, False, False, False],
+                                                                  [False, True,  True,  True, False],
+                                                                  [False, True,  True,  True, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, False, False, False, False],
+                                                                ]),
+                                      'coordinates_of_center' : (2,2)},
+                                'Somme' : {'grid' : np.array([    [False, False, False, False, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, False, False, False, False],
+                                                                ]),
+                                      'coordinates_of_center' : (2,2)},
+                                'Authie' : {'grid' : np.array([     [False, False, False, False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, False, False, False, False],
+                                                                  ]),
+                                                              'coordinates_of_center' : (2,2)},
+                                'Canche' : {'grid' : np.array([     [False, False, False, False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, False, False, False, False],
+                                                                  ]),
+                                                              'coordinates_of_center' : (2,2)},
+                                'Liane' : {'grid' : np.array([      [False, False, False, False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, False, False, False, False],
+                                                                  ]),
+                                                              'coordinates_of_center' : (2,2)}}
+          
+        bathymetric_threshold = 0
+        starting_points = { 'Arques' : (49.94, 1.08),
+                            'Bresle' : (50.06, 1.37),
+                            'Somme' : (50.23, 1.58),
+                            'Authie' : (50.37, 1.58),
+                            'Canche' : (50.55, 1.60),
+                            'Liane' : (50.73, 1.59)}
+        core_of_the_plumes = {'Arques' : (49.95, 1.07),
+                              'Bresle' : (50.08, 1.37),
+                              'Somme' : (50.25, 1.45),
+                              'Authie' : (50.38, 1.52),
+                              'Canche' : (50.56, 1.54),
+                              'Liane' : (50.75, 1.56)}
+        lat_range_of_the_area_to_check_for_clouds = [49.75, 50.85]
+        lon_range_of_the_area_to_check_for_clouds = [0.75, 1.75]
+        threshold_of_cloud_coverage_in_percentage = 25
+        lat_range_of_the_map_to_plot = [49.20, 51.5]
+        lon_range_of_the_map_to_plot = [-1.5, 3]
+        lat_range_to_search_plume_area = [49.75, 49.75, 51.15, 50.4]
+        lon_range_to_search_plume_area = [0.5, 1.75, 1.75, 0.5]
+        max_steps_for_the_directions = { 'Arques' : None, 'Bresle' : None, 'Somme' : None,
+                                        'Authie' : None, 'Canche' : None, 'Liane' : None}
+        river_mouth_to_exclude = {}
+      
+    if Zone == 'SOUTHERN_BRITTANY': 
+         
+        lon_new_resolution = 0.015
+        lat_new_resolution = 0.015
+        searching_strategies = {'Loire' : {'grid' : np.array([    [False, False, False, False, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, True,  True,  False, False],
+                                                                  [False, True,  True,  True, False],
+                                                                  [False, False, False, False, False],
+                                                                ]),
+                                      'coordinates_of_center' : (2,2)},
+                                'Vilaine' : {'grid' : np.array([    [False, False, False, False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, True,  True,  False, False],
+                                                                    [False, False, False, False, False],
+                                                                  ]),
+                                                              'coordinates_of_center' : (2,2)}}
+        bathymetric_threshold = 0
+        starting_points = {'Loire' : (47.29, -2.10),
+                            'Vilaine' : (47.50, -2.46)}
+        core_of_the_plumes = {'Loire' : (47.19, -2.36),
+                              'Vilaine' : (47.47, -2.59)}
+        lat_range_of_the_area_to_check_for_clouds = [46.87, 47.55]
+        lon_range_of_the_area_to_check_for_clouds = [-3, -2.01]
+        threshold_of_cloud_coverage_in_percentage = 25
+        lat_range_of_the_map_to_plot = [46, 48] # [46, 48.5]
+        lon_range_of_the_map_to_plot = [-4.5, -1] # [-5, -1.5]
+        lat_range_to_search_plume_area = [46.5, 47.9]
+        lon_range_to_search_plume_area = [-180, 180]
+        maximal_bathymetric_for_zone_with_resuspension = {'Loire' : 20, 'Vilaine' : 20}
+        minimal_distance_from_estuary_for_zone_with_resuspension = {'Loire' : 20, 'Vilaine' : 20}
+        max_steps_for_the_directions = { 'Loire' : 100, 'Vilaine' : 50}
+        maximal_threshold = { 'Loire' : 8, 'Vilaine' : 8} # 12
+        minimal_threshold = { 'Loire' : 4, 'Vilaine' : 4} # 3
+        quantile_to_use = { 'Loire' : 0.2, 'Vilaine' : 0.2}
+        fixed_threshold = {'Loire' : 5.4, 'Vilaine' : 5.0} 
+        river_mouth_to_exclude = {}
+    
+    searching_strategy_directions = coordinates_of_pixels_to_inspect( searching_strategies )
+    
+    return {'lon_new_resolution' : lon_new_resolution, 
+            'lat_new_resolution' : lat_new_resolution, 
+            'searching_strategies' : searching_strategies, 
+            'bathymetric_threshold' : bathymetric_threshold, 
+            'starting_points' : starting_points, 
+            'core_of_the_plumes' : core_of_the_plumes,
+            'lat_range_of_the_area_to_check_for_clouds' : lat_range_of_the_area_to_check_for_clouds, 
+            'lon_range_of_the_area_to_check_for_clouds' : lon_range_of_the_area_to_check_for_clouds, 
+            'threshold_of_cloud_coverage_in_percentage' : threshold_of_cloud_coverage_in_percentage,
+            'lat_range_of_the_map_to_plot' : lat_range_of_the_map_to_plot, 
+            'lon_range_of_the_map_to_plot' : lon_range_of_the_map_to_plot, 
+            'lat_range_to_search_plume_area' : lat_range_to_search_plume_area, 
+            'lon_range_to_search_plume_area' : lon_range_to_search_plume_area,
+            'maximal_bathymetric_for_zone_with_resuspension' : maximal_bathymetric_for_zone_with_resuspension,
+            'minimal_distance_from_estuary_for_zone_with_resuspension' : minimal_distance_from_estuary_for_zone_with_resuspension,
+            'max_steps_for_the_directions' : max_steps_for_the_directions,
+            'maximal_threshold' : maximal_threshold,
+            'minimal_threshold' : minimal_threshold,
+            'quantile_to_use' : quantile_to_use,
+            'fixed_threshold' : fixed_threshold,
+            'river_mouth_to_exclude' : river_mouth_to_exclude,
+            'searching_strategy_directions' : searching_strategy_directions}
+
+
+def coordinates_of_pixels_to_inspect(searching_strategies) : 
+     
+    """
+   Computes the relative distances from a center pixel to all "True" pixels 
+   in a given grid for each search strategy.
+
+   Parameters
+   ----------
+   searching_strategies : dict
+       A dictionary where each key corresponds to a search strategy. Each value 
+       is another dictionary with:
+           - 'grid' : 2D boolean numpy array
+               A boolean grid where "True" indicates pixels of interest.
+           - 'coordinates_of_center' : tuple of int
+               Coordinates (row, column) of the center pixel in the grid.
+
+   Returns
+   -------
+   to_return : dict
+       A dictionary where each key corresponds to a search strategy and each value 
+       is a list of tuples representing the relative distances of "True" pixels 
+       from the center pixel.
+   """
+
+    to_return = {} # Initialize an empty dictionary to store results
+       
+    # Iterate through each search strategy in the input dictionary
+    for index, searching_strategy in searching_strategies.items() : 
+    
+        # Initialize a list to store the distances (as tuples) for this strategy
+        distance_list = []
+        
+        # Extract the boolean grid (a 2D array) and center pixel coordinates
+        boolean_array = searching_strategy['grid']
+        coordinate_of_the_center = searching_strategy['coordinates_of_center']
+        
+        # Loop through each pixel in the grid
+        for i in range(boolean_array.shape[0]): # Iterate over rows
+        
+            for j in range(boolean_array.shape[1]):  # Iterate over columns
+            
+                # Check if the pixel is "True"
+                if boolean_array[i, j]:
+                    
+                    # Calculate the horizontal distance (x-axis) from the center
+                    distance_x = coordinate_of_the_center[0] - i
+                    
+                    # Calculate the vertical distance (y-axis) and invert sign for standard image coordinates
+                    # We multiply by -1 to account for typical image coordinate systems where y-coordinates increase downwards
+                    distance_y = (coordinate_of_the_center[1] - j) * -1
+                    
+                    # Append the distance (as a tuple) to the list
+                    distance_list.append((distance_x, distance_y))
+             
+        # Exclude the center pixel itself (distance of (0, 0))
+        distance_list = concave_hull( [x for x in distance_list if x != (0,0)] )
+        
+        # Ensure that distances are ordered sequentially (no large jumps)
+        distance_list_in_good_order = abs( np.array( np.diff( [ np.sum(x) for x in distance_list ] ) ) ) <= 1
+        
+        # If distances are not in a good order, reorder them
+        if any( distance_list_in_good_order == False ) : 
+            index_start_element = np.where( distance_list_in_good_order == False )[0] +1
+            distance_list = [distance_list[ index_start_element[0] ], 
+                             distance_list[ index_start_element[0]: ],
+                             distance_list[ :index_start_element[0] ]]
+            distance_list = flatten_a_list(distance_list)  # Flatten the reordered list
+            distance_list = list(dict.fromkeys(distance_list))  # Remove duplicates while preserving order
+        
+        # Store the computed list of distances in the dictionary
+        to_return[f'{index}'] = distance_list
+           
+    # Return the dictionary containing the distances for all search strategies
+    return to_return
+
+def flatten_a_list(lst):
+    
+    """
+    Flatten a nested list into a single list.
+
+    Parameters
+    ----------
+    lst : list
+        A potentially nested list of elements.
+
+    Returns
+    -------
+    list
+        A flattened list containing all elements from the nested list.
+    """
+    
+    flat_list = []
+    for item in lst:
+        if isinstance(item, list):
+            flat_list.extend(flatten_a_list(item))  # Recursive call for nested lists
+        else:
+            flat_list.append(item)
+    return flat_list
+

@@ -3,8 +3,8 @@ new.packages <- list_of_packages[!(list_of_packages %in% installed.packages()[,"
 if(length(new.packages)) install.packages(new.packages)
 lapply(list_of_packages, require, character.only = TRUE)
 
-# where_are_saved_X11_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS'
-# Zone= "SOUTHERN_BRITTANY"
+# where_are_saved_X11_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST4'
+# Zone= "BAY_OF_SEINE"
 # Data_source = "SEXTANT"
 # sensor_name = "merged"
 # atmospheric_correction = "Standard"
