@@ -96,3 +96,10 @@ def extract_insitu_stations_and_save_the_file_for_plot(folder_where_to_save_Figu
     stations_in_the_RIOMARS = insitu_stations.iloc[index_of_stations_in_the_RIOMARS]
     
     stations_in_the_RIOMARS.to_csv(folder_where_to_save_Figure_data + "/Stations_position.csv")
+    
+    
+def dates_for_each_zone() : 
+    return {'GULF_OF_LION' : '2014-01-04',
+            'BAY_OF_BISCAY' : '2009-04-22',
+            'SOUTHERN_BRITTANY' : '2016-05-23',# '2022-01-21',
+            'BAY_OF_SEINE' : '2018-02-25'}

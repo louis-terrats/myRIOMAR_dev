@@ -1176,7 +1176,7 @@ def find_SPM_threshold(spm_map, land_mask, start_point, directions, max_steps, m
     # SPM_threshold = np.nanmin( filtered_values )
     SPM_threshold = np.max( [np.nanquantile(filtered_values, quantile_to_use), minimal_threshold] ) # 0.25
     
-    return SPM_threshold, filtered_points
+    return SPM_threshold, filtered_points, gradient_points
 
 
 def find_first_nan_after_finite(arr):
@@ -1888,7 +1888,8 @@ def preprocess_annual_dataset_and_compute_land_mask(path_to_annual_ds, parameter
     # Load the annual dataset for plume detection
     with open(path_to_annual_ds, 'rb') as f:
             
-        multi_annual_ds = pickle.load(f)['Basin_map']['map_data']             
+        multi_annual_ds = pickle.load(f)['Basin_map']['map_data']        
+        multi_annual_ds.values[multi_annual_ds.values < 0] = np.nan
                                     
     # Select a subset of the annual dataset based on the area to check for cloud coverage
     multi_annual_ds_subset = multi_annual_ds.sel(lat=slice(parameters['lat_range_of_the_area_to_check_for_clouds'][0], 
@@ -2247,7 +2248,7 @@ class Create_the_plume_mask :
         # quantile_to_use = self.parameters['quantile_to_use'][self.plume_name]
         
         if dynamic_determination_of_SPM_threshold : 
-            SPM_threshold, points_used_for_finding_SPM_threshold = find_SPM_threshold(spm_map = self.spm_map, 
+            SPM_threshold, points_used_for_finding_SPM_threshold, all_points_tested = find_SPM_threshold(spm_map = self.spm_map, 
                                                 land_mask = self.land_mask,
                                                 start_point = self.parameters['pixel_starting_points'][self.plume_name], 
                                                 directions = self.parameters['searching_strategy_directions'][self.plume_name],
@@ -2256,6 +2257,11 @@ class Create_the_plume_mask :
                                                 minimal_threshold = self.parameters['minimal_threshold'][self.plume_name],
                                                 quantile_to_use = self.parameters['quantile_to_use'][self.plume_name])
             self.points_used_for_finding_SPM_threshold = points_used_for_finding_SPM_threshold
+            
+            all_points_tested = all_points_tested.reshape(-1,2)
+            all_points_tested = all_points_tested[~np.isnan(all_points_tested).any(axis=1)]
+            self.all_points_tested_for_finding_SPM_threshold = all_points_tested
+            
         else : 
             SPM_threshold = self.parameters['fixed_threshold'][self.plume_name]
                 
@@ -2653,15 +2659,30 @@ class Create_the_plume_mask :
         })
         
         if name_of_the_plot == 'B' :
+            
             latitudes_used_for_finding_SPM_threshold = lat_values[self.points_used_for_finding_SPM_threshold[:,1].astype(int)]
             longitudes_used_for_finding_SPM_threshold = lon_values[self.points_used_for_finding_SPM_threshold[:,0].astype(int)]
             points_used_for_finding_SPM_threshold = pd.DataFrame({'longitude': longitudes_used_for_finding_SPM_threshold, 
                                                                   'latitude': latitudes_used_for_finding_SPM_threshold})
             points_used_for_finding_SPM_threshold.to_csv( os.path.join(folder_where_to_save_data, f"{name_of_the_plot}_points_used_for_finding_SPM_threshold.csv") )
+
+            all_latitudes_used_for_finding_SPM_threshold = lat_values[self.all_points_tested_for_finding_SPM_threshold[:,1].astype(int)]
+            all_longitudes_used_for_finding_SPM_threshold = lon_values[self.all_points_tested_for_finding_SPM_threshold[:,0].astype(int)]
+            all_points_used_for_finding_SPM_threshold = pd.DataFrame({'longitude': all_longitudes_used_for_finding_SPM_threshold, 
+                                                                  'latitude': all_latitudes_used_for_finding_SPM_threshold})
+            all_points_used_for_finding_SPM_threshold.to_csv( os.path.join(folder_where_to_save_data, f"{name_of_the_plot}_all_points_used_for_finding_SPM_threshold.csv") )
+                    
         
         if 'plume_mask' in vars(self) :
             df['plume'] = self.plume_mask.values.flatten()
         
+        index_to_keep = np.where((df.lat >= self.parameters['lat_range_of_the_map_to_plot'][0]) & 
+                                 (df.lat <= self.parameters['lat_range_of_the_map_to_plot'][1]) & 
+                                 (df.lon >= self.parameters['lon_range_of_the_map_to_plot'][0]) & 
+                                 (df.lon <= self.parameters['lon_range_of_the_map_to_plot'][1]) )
+        
+        df = df.iloc[index_to_keep]
+
         df.to_csv( os.path.join(folder_where_to_save_data, f"{name_of_the_plot}.csv") )
         
         # Source the R script

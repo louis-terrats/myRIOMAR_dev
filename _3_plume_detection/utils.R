@@ -5,12 +5,12 @@ lapply(list_of_packages, require, character.only = TRUE)
 
 #### Main ####
 
-# where_are_saved_plume_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST'
-# where_to_save_plume_time_series = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS/TEST'
-# # Zone = c('GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY')
-# Zone = c('BAY_OF_SEINE')
+# where_are_saved_plume_results = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST'
+# where_to_save_plume_time_series = '/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST'
+# Zone = c('BAY_OF_SEINE', 'GULF_OF_LION', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY')
+# # Zone = c('BAY_OF_SEINE')
 # Data_source = 'SEXTANT'
-# Satellite_sensor = c('merged')
+# Satellite_sensor = c('modis')
 # atmospheric_correction = 'Standard'
 # Temporal_resolution = 'WEEKLY'
 # Years = 1998:2024
@@ -77,7 +77,7 @@ plot_time_series_of_plume_area_and_thresholds <- function(where_are_saved_plume_
         filter(Zone == row$Zone, Temporal_resolution == row$Temporal_resolution) %>%
         select(-matches( paste0("SPM_threshold_", setdiff(Plumes %>% unlist() %>% str_replace(" ", ".") %>% append(" "), plume_names) ) )) %>% 
         select_if(~sum(!is.na(.)) > 0) %>% 
-        filter_at(vars(starts_with('SPM_threshold')), ~ is.finite(.)) %>% 
+        # filter_at(vars(starts_with('SPM_threshold')), ~ is.finite(.)) %>% 
         mutate(path_to_file = file_path %>% 
                  str_replace(as.character(where_are_saved_plume_results), where_to_save_plume_time_series) %>% 
                  str_remove_all('[*][A-Za-z0-9/_-]*')) 

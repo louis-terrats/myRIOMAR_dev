@@ -34,7 +34,7 @@ matplotlib.use('agg') # Prevent showing plot in the Plot panel (this saves RAM m
 #                     'end_day' : '2021/01/31'}
 
 core_arguments = {  'Data_sources': ['SEXTANT'], # ODATIS / SEXTANT / EUMETSAT
-                    'Sensor_names':["modis"], 
+                    'Sensor_names':["merged"], 
                     'Satellite_variables':['SPM'], 
                     'Atmospheric_corrections':["Standard"], # Standard (SEXTANT / EUMETSAT) /  ...
                     'Temporal_resolution': ["WEEKLY"], # A enlever ! 
@@ -93,32 +93,25 @@ myRIOMAR._2_regional_maps.create_regional_maps(core_arguments,
 #%% Detect the plumes
 
 myRIOMAR._3_plume_detection.apply_plume_mask(core_arguments,
-                                             Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
-                                             # Zones = ['BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
+                                             # Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
+                                             Zones = ['SOUTHERN_BRITTANY'],
                                              detect_plumes_on_which_temporal_resolution_data = 'WEEKLY',
-                                             nb_of_cores_to_use = 6,
+                                             nb_of_cores_to_use = 4,
                                              use_dynamic_threshold = True,
-                                             where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS",
-                                             where_to_save_plume_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST_with_fixed_threshold")
-
-myRIOMAR._3_plume_detection.apply_plume_mask(core_arguments,
-                                             Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
-                                             # Zones = ['BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
-                                             detect_plumes_on_which_temporal_resolution_data = 'WEEKLY',
-                                             nb_of_cores_to_use = 6,
-                                             use_dynamic_threshold = False,
                                              where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS",
                                              where_to_save_plume_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST")
 
+
 #%% Plot time-series of plume surface
+
 myRIOMAR._3_plume_detection.make_and_plot_time_series_of_plume_areas(core_arguments,
-                                                     # Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
-                                                     Zones = ['BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
-                                                     # Zones = ['BAY_OF_SEINE'],
+                                                     Zones = ['GULF_OF_LION', 'BAY_OF_SEINE', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
+                                                     # Zones = ['GULF_OF_LION', 'BAY_OF_BISCAY', 'SOUTHERN_BRITTANY'],
                                                      nb_of_cores_to_use = 4,
                                                      on_which_temporal_resolution_the_plumes_have_been_detected = 'WEEKLY',
-                                                     where_are_saved_plume_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST_with_fixed_threshold",
-                                                     where_to_save_plume_time_series = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST_with_fixed_threshold")
+                                                     where_are_saved_plume_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST_with_fixed_threshold/",
+                                                     where_to_save_plume_time_series = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST_with_fixed_threshold/")
+
 
 #%% Do X11 analysis on plume time-series
 
@@ -147,3 +140,11 @@ myRIOMAR._5_Figures_for_article.Figure_4(where_are_saved_regional_maps = "/home/
 
 myRIOMAR._5_Figures_for_article.Figure_5(where_are_saved_regional_maps = "/home/terrats/Desktop/RIOMAR/TEST/",
                                          where_to_save_the_figure = "/home/terrats/Desktop/RIOMAR/TEST/")
+
+myRIOMAR._5_Figures_for_article.Figure_6_7(where_are_saved_plume_results_with_dynamic_threshold = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST/",
+                                           where_are_saved_plume_results_with_fixed_threshold = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST_with_fixed_threshold/",
+                                           where_to_save_the_figure = "/home/terrats/Desktop/RIOMAR/TEST/")
+
+myRIOMAR._5_Figures_for_article.Figure_8_9_10(
+                                           where_are_saved_X11_results = "/home/terrats/Desktop/RIOMAR/TEST/RESULTS/NEW_TEST/",
+                                           where_to_save_the_figure = "/home/terrats/Desktop/RIOMAR/TEST/")
