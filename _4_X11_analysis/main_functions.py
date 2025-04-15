@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import rpy2.robjects as robjects
 
 from myRIOMAR_dev._4_X11_analysis.utils import (temporal_decomp_V2_7_x11, apply_X11_method_and_save_results)
-from utils import (get_all_cases_to_process_for_regional_maps_or_plumes_or_X11, path_to_fill_to_where_to_save_satellite_files, 
+from _99_common.utils import (get_all_cases_to_process_for_regional_maps_or_plumes_or_X11, path_to_fill_to_where_to_save_satellite_files, 
                    fill_the_sat_paths, load_csv_files_in_the_package_folder, define_parameters)
 
 

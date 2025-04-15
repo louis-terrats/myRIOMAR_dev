@@ -2,7 +2,7 @@ import pandas as pd
 
 from _2_regional_maps.utils import Create_and_save_the_maps, QC_maps
 
-from utils import (unique_years_between_two_dates, get_all_cases_to_process_for_regional_maps_or_plumes_or_X11)
+from _99_common.utils import (unique_years_between_two_dates, get_all_cases_to_process_for_regional_maps_or_plumes_or_X11)
 
 
 def create_regional_maps(core_arguments, Zones, overwrite_existing_regional_maps, save_map_plots_of_which_time_frequency, nb_of_cores_to_use,

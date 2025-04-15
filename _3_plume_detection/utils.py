@@ -17,7 +17,7 @@ from functools import reduce
 import rpy2.robjects as robjects
 
 
-from utils import (load_file, coordinates_of_pixels_to_inspect)
+from _99_common.utils import (load_file, coordinates_of_pixels_to_inspect)
 
 # =============================================================================
 #### Functions

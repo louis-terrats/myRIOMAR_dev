@@ -12,7 +12,7 @@ import pandas as pd
 
 import glob, os, pickle
 
-from utils import path_to_fill_to_where_to_save_satellite_files, define_parameters
+from _99_common.utils import path_to_fill_to_where_to_save_satellite_files, define_parameters
 from _1_data_validation.utils import get_insitu_measurements
 
                    

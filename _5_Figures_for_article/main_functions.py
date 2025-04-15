@@ -12,7 +12,7 @@ import numpy as np
 from functools import reduce
 import pandas as pd
 
-from utils import (load_csv_files_in_the_package_folder, path_to_fill_to_where_to_save_satellite_files, align_bathymetry_to_resolution, define_parameters)
+from _99_common.utils import (load_csv_files_in_the_package_folder, path_to_fill_to_where_to_save_satellite_files, align_bathymetry_to_resolution, define_parameters)
 from _5_Figures_for_article.utils import save_files_for_Figure_1, load_the_regional_maps_and_save_them_for_plotting, dates_for_each_zone
 from _3_plume_detection.utils import (reduce_resolution,  
                                       preprocess_annual_dataset_and_compute_land_mask, create_polygon_mask,

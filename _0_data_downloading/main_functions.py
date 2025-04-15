@@ -6,7 +6,7 @@ from _0_data_downloading.utils import (download_satellite_data, merge_and_save_t
                                                remove_empty_folders, fill_the_sat_paths)
 
 
-from utils import (get_all_cases_to_process)
+from _99_common.utils import (get_all_cases_to_process)
 
 def Download_satellite_data(core_arguments, nb_of_cores_to_use, overwrite_existing_satellite_files, where_to_save_satellite_data) : 
     
