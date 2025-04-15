@@ -41,6 +41,16 @@ pip install -r requirements.txt
 
 ---
 
+## 🛠 Requirements
+
+Make sure the following are installed:
+
+- Python ≥ 3.8
+- Packages listed in requirements.txt
+- R (used for some post-processing steps, mainly plotting)
+
+---
+
 ## 🧭 Project Structure
 
 ```
@@ -51,18 +61,17 @@ myRIOMAR_dev/
 ├── _3_plume_detection/        # Detect river plumes and analyze morphology
 ├── _4_X11_analysis/           # Time series decomposition (X11 method)
 ├── _5_Figures_for_article/    # Reproducible figure generation for a publication led by David Doxaran.
-├── utils.R                    # R utilities (requires R installed)
+├── _99_common/                # R and Python utilities common to all modules
+├── main.py                    # Execution script of package functions
 ```
 
 ---
 
-## 🛠 Requirements
+## 📚 Usage
 
-Make sure the following are installed:
+All the work can be done with the 'main.py' script.
 
-- Python ≥ 3.8
-- Packages listed in requirements.txt
-- R (used for some post-processing steps, mainly plotting)
+This script will be cleaned up in the coming weeks, to make it easier to use.
 
 ---
 
