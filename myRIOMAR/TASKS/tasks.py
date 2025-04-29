@@ -11,16 +11,17 @@ import glob
 import yaml
 import sys
 
+# --- Define PACKAGE_ROOT and add to sys.path ---
 PACKAGE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(PACKAGE_ROOT)
 
-# sys.path.append(PACKAGE_ROOT)
-# import myRIOMAR_dev as myRIOMAR
+# --- Import your package ---
+import myRIOMAR_dev as myRIOMAR
 
-# Load all YAML configuration files
+# --- Load YAML configuration ---
 yaml_files = glob.glob(os.path.join(PACKAGE_ROOT, "CONFIG", "*.yaml"))
 
 core_arguments = {}
-
 for yaml_file in yaml_files:
     with open(yaml_file, "r") as f:
         content = yaml.safe_load(f)
@@ -28,11 +29,14 @@ for yaml_file in yaml_files:
             # Merge dictionaries
             core_arguments.update(content)
 
-# Set commonly used paths
+# --- Define common variables ---
 RESULTS_DIR = core_arguments['Paths']['Where_to_save_results']
 GLOBAL_MAPS_dir = core_arguments['Paths']['Where_to_save_satellite_global_map']
 nb_cores = core_arguments['Multithreading']['nb_of_cores_to_use']
 use_dynamic_threshold_for_plume_detection = core_arguments['Plume_detection']['Use_dynamic_threshold']
+
+
+# --- TASK FUNCTIONS ---
 
 def download_data(core_arguments, 
                   overwrite=False):
