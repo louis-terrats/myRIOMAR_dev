@@ -1,14 +1,14 @@
 Product_selection:
   Data_sources:
-    - SEXTANT
+#    - SEXTANT
     - ODATIS
   Sensor_names:
-    - merged
+#    - merged
     - modis
   Satellite_variables:
     - SPM
   Atmospheric_corrections:
-    - Standard
+#    - Standard
     - polymer
   Regions:
     - GULF_OF_LION
@@ -16,7 +16,7 @@ Product_selection:
 
 Period_selection:
   start_day: '2020/01/01'
-  end_day: '2020/01/31'
+  end_day: '2020/01/02'
 
 
 Temporal_resolution:
