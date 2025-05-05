@@ -657,6 +657,9 @@ def plot_the_maps_in_the_folder(path) :
     # mpl.use('module://matplotlib_inline.backend_inline') # To show plots on the Plot panel (be careful as it consumes RAM memory !)
     mpl.use('agg') # Prevent showing plot in the Plot panel (this saves RAM memory)
     
+    if os.path.isdir(path) == False : 
+        return
+    
     nc_files = [f for f in os.listdir(path) if f.endswith(".nc")]
     
     for nc_file in nc_files:

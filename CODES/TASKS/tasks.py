@@ -33,24 +33,17 @@ for yaml_file in yaml_files:
 # --- Define common variables ---
 RESULTS_DIR = core_arguments['Paths']['Where_to_save_results']
 GLOBAL_MAPS_dir = core_arguments['Paths']['Where_to_save_satellite_global_map']
-nb_cores = core_arguments['Multithreading']['nb_of_cores_to_use']
+nb_cores = core_arguments['Multiprocessing']['nb_of_cores_to_use']
 use_dynamic_threshold_for_plume_detection = core_arguments['Plume_detection']['Use_dynamic_threshold']
 
 
 # --- TASK FUNCTIONS ---
 
-def download_data(core_arguments):
-    myRIOMAR_dev.CODES._0_data_downloading.Download_satellite_data(core_arguments)
+def download_data(core_arguments, overwrite = False):
+    myRIOMAR_dev.CODES._0_data_downloading.Download_satellite_data(core_arguments, overwrite)
 
-def plot_global_maps(core_arguments, 
-                     start_day=None, end_day=None):
-    myRIOMAR._0_data_downloading.Plot_and_Save_the_map(
-        core_arguments,
-        nb_of_cores_to_use=nb_cores,
-        where_are_saved_satellite_data=GLOBAL_MAPS_dir,
-        start_day_of_maps_to_plot=start_day,
-        end_day_of_maps_to_plot=end_day,
-    )
+def plot_global_maps(core_arguments):
+    myRIOMAR_dev.CODES._0_data_downloading.Plot_and_Save_the_map(core_arguments)
 
 def match_up_with_insitu(core_arguments,
                          redo_the_MU_database=False):

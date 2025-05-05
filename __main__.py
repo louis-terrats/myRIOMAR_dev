@@ -27,9 +27,7 @@ def main():
     parser_download.add_argument('--overwrite', action='store_true', help='Overwrite existing data')
 
     # --- plot ---
-    parser_plot = subparsers.add_parser('plot', help='Plot global maps')
-    parser_plot.add_argument('--start_day', type=str, default=None, help='Start date (YYYY-MM-DD)')
-    parser_plot.add_argument('--end_day', type=str, default=None, help='End date (YYYY-MM-DD)')
+    parser_plot = subparsers.add_parser('plot_global_maps', help='Plot global maps')
 
     # --- match-up ---
     parser_matchup = subparsers.add_parser('matchup', help='Match satellite with in-situ data')
@@ -55,8 +53,8 @@ def main():
     # === Call the corresponding tasks ===
     if args.command == 'download':
         tasks.download_data(tasks.core_arguments, overwrite=args.overwrite)
-    elif args.command == 'plot':
-        tasks.plot_global_maps(tasks.core_arguments, start_day=args.start_day, end_day=args.end_day)
+    elif args.command == 'plot_global_maps':
+        tasks.plot_global_maps(tasks.core_arguments)
     elif args.command == 'matchup':
         tasks.match_up_with_insitu(tasks.core_arguments, redo_the_MU_database=args.redo)
     elif args.command == 'maps':

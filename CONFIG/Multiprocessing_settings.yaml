@@ -1,2 +1,2 @@
-Multithreading:
+Multiprocessing:
   nb_of_cores_to_use: 4
