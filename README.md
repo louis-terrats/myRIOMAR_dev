@@ -21,21 +21,52 @@ It enables automated data download, validation, regional mapping, plume detectio
 
 ---
 
+## 📁 Project Structure
+
+myRIOMAR_dev/                                             
+├── CODES/                           
+│   ├── _0_data_downloading/         
+│   ├── _1_data_validation/          
+│   ├── _2_regional_maps/            
+│   ├── _3_plume_detection/          
+│   ├── _4_X11_analysis/             
+│   └── _5_Figures_for_article/     
+├── CONFIG/                          
+│   ├── general.yaml                 
+│   ├── paths.yaml                   
+│   └── multithreading.yaml          
+├── .Rhistory                        
+├── .gitattributes                   
+├── .gitignore                       
+├── Environment.yml                  
+├── LICENSE                          
+├── README.md                        
+├── __main__.py                      
+├── requirements.txt                 
+└── setup.py                         
+
+---
+
+
 ## 📦 Installation
 
-### Using Conda (recommended)
+### 1) Clone the repository
 
-#### For Unix/macOS or generic setup
 ```
-conda env create -f myRIOMAR.yml
+git clone https://github.com/louis-terrats/myRIOMAR_dev.git
+cd myRIOMAR_dev
+```
+
+### 2) Install dependencies
+
+#### Using Conda (recommended)
+```
+conda env create -f Environment.yml
 conda activate myRIOMAR
 ```
 
 #### Using pip
-Clone the repository and install dependencies:
 ```
-git clone https://github.com/louis-terrats/myRIOMAR_dev.git
-cd myRIOMAR_dev
 pip install -r requirements.txt
 ```
 
@@ -51,27 +82,42 @@ Make sure the following are installed:
 
 ---
 
-## 🧭 Project Structure
-
-```
-myRIOMAR_dev/
-├── _0_data_downloading/       # Scripts to download satellite data
-├── _1_data_validation/        # Quality control of satellite data using matchups with *insitu* measurements  
-├── _2_regional_maps/          # Generate regional maps
-├── _3_plume_detection/        # Detect river plumes and analyze morphology
-├── _4_X11_analysis/           # Time series decomposition (X11 method)
-├── _5_Figures_for_article/    # Reproducible figure generation for a publication led by David Doxaran.
-├── _99_common/                # R and Python utilities common to all modules
-├── main.py                    # Execution script of package functions
-```
-
----
-
 ## 📚 Usage
 
-All the work can be done with the 'main.py' script.
+### ⚙️ Configuration
+All parameters live in CONFIG/*.yaml:
 
-This script will be cleaned up in the coming weeks, to make it easier to use.
+- general.yaml: data sources, sensors, variable lists, date range
+
+- paths.yaml: Package_root, Data_save_dir, Results_dir
+
+- multithreading.yaml: nb_of_cores_to_use, plume thresholds
+
+_Edit these files to customize your workflow._
+
+### 🎯 Command-Line Interface
+After installation, run:
+
+```
+python -m myRIOMAR_dev <command> [options]
+```
+| Command      | Description                                       | Options       |
+| ------------ | ------------------------------------------------- | ------------- |
+| `download`   | Download satellite data                           | `--overwrite` |
+| `validate`   | Match satellite with in-situ measurements         | `--redo`      |
+| `maps`       | Generate regional maps                            | `--overwrite` |
+| `plume`      | Detect plumes (dynamic or fixed threshold)        | `--dynamic`   |
+| `timeseries` | Plot plume area time-series                       | *(none)*      |
+| `x11`        | Apply X11 seasonal decomposition                  | *(none)*      |
+| `figures`    | Generate figures for publication (Fig. 1…Fig. 10) | *(none)*      |
+
+_Examples_:
+
+```
+python -m myRIOMAR_dev download --overwrite
+python -m myRIOMAR_dev maps --overwrite
+python -m myRIOMAR_dev plume --dynamic
+```
 
 ---
 
