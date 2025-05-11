@@ -101,15 +101,15 @@ After installation, run:
 ```
 python -m myRIOMAR_dev <command> [options]
 ```
-| Command      | Description                                       | Options       |
-| ------------ | ------------------------------------------------- | ------------- |
-| `download`   | Download satellite data                           | `--overwrite` |
-| `validate`   | Match satellite with in-situ measurements         | `--redo`      |
-| `maps`       | Generate regional maps                            | `--overwrite` |
-| `plume`      | Detect plumes (dynamic or fixed threshold)        | `--dynamic`   |
-| `timeseries` | Plot plume area time-series                       | *(none)*      |
-| `x11`        | Apply X11 seasonal decomposition                  | *(none)*      |
-| `figures`    | Generate figures for publication (Fig. 1…Fig. 10) | *(none)*      |
+| Command      | Description                                       | Options       | Operational
+| ------------ | ------------------------------------------------- | ------------- | -----------
+| `download`   | Download satellite data                           | `--overwrite` | X
+| `validate`   | Match satellite with in-situ measurements         | `--redo`      | X
+| `maps`       | Generate regional maps                            | `--overwrite` | X
+| `plume`      | Detect plumes (dynamic or fixed threshold)        | `--dynamic`   | (in dev)
+| `timeseries` | Plot plume area time-series                       | *(none)*      | (in dev)
+| `x11`        | Apply X11 seasonal decomposition                  | *(none)*      | (in dev)
+| `figures`    | Generate figures for publication (Fig. 1…Fig. 10) | *(none)*      | (in dev)
 
 _Examples_:
 
